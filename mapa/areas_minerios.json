@@ -1,0 +1,76 @@
+{
+    "largura_imagem": 3360,
+    "altura_imagem": 1920,
+    "areas": [
+        {
+            "x": 810,
+            "y": 760,
+            "largura": 180,
+            "altura": 143,
+            "tipo": "cobre",
+            "maximo": 3,
+            "inicial": 2,
+            "respawn": 8.0
+        },
+        {
+            "x": 1650,
+            "y": 613,
+            "largura": 173,
+            "altura": 127,
+            "tipo": "crystal",
+            "maximo": 1,
+            "inicial": 1,
+            "respawn": 25.0
+        },
+        {
+            "x": 1473,
+            "y": 620,
+            "largura": 120,
+            "altura": 127,
+            "tipo": "cobalto",
+            "maximo": 1,
+            "inicial": 1,
+            "respawn": 10.0
+        },
+        {
+            "x": 1250,
+            "y": 1140,
+            "largura": 347,
+            "altura": 117,
+            "tipo": "arbusto",
+            "maximo": 3,
+            "inicial": 3,
+            "respawn": 20.0
+        },
+        {
+            "x": 2350,
+            "y": 993,
+            "largura": 160,
+            "altura": 224,
+            "tipo": "arbusto",
+            "maximo": 3,
+            "inicial": 3,
+            "respawn": 20.0
+        },
+        {
+            "x": 1117,
+            "y": 1120,
+            "largura": 126,
+            "altura": 100,
+            "tipo": "ferro",
+            "maximo": 3,
+            "inicial": 3,
+            "respawn": 20.0
+        },
+        {
+            "x": 917,
+            "y": 610,
+            "largura": 126,
+            "altura": 80,
+            "tipo": "ouro",
+            "maximo": 3,
+            "inicial": 3,
+            "respawn": 20.0
+        }
+    ]
+}

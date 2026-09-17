@@ -1,0 +1,94 @@
+{
+    "itens": [
+        {
+            "id": "ferro",
+            "nome": "Ferro",
+            "categoria": "minerio",
+            "peso": 3.0,
+            "preco_base": 5.0,
+            "cor": [
+                150,
+                150,
+                150
+            ],
+            "solido": true,
+            "tempo_coleta": 2.0,
+            "respawn": true
+        },
+        {
+            "id": "cobre",
+            "nome": "Cobre",
+            "categoria": "minerio",
+            "peso": 2.0,
+            "preco_base": 7.0,
+            "cor": [
+                220,
+                115,
+                45
+            ],
+            "solido": true,
+            "tempo_coleta": 2.0,
+            "respawn": true
+        },
+        {
+            "id": "ouro",
+            "nome": "Ouro",
+            "categoria": "minerio",
+            "peso": 1.0,
+            "preco_base": 15.0,
+            "cor": [
+                255,
+                210,
+                0
+            ],
+            "solido": true,
+            "tempo_coleta": 2.0,
+            "respawn": true
+        },
+        {
+            "id": "crystal",
+            "nome": "Crystal",
+            "categoria": "minerio",
+            "peso": 0.5,
+            "preco_base": 12.0,
+            "tempo_coleta": 6.0,
+            "cor": [
+                150,
+                0,
+                50
+            ],
+            "solido": true,
+            "respawn": true
+        },
+        {
+            "id": "cobalto",
+            "nome": "Cobalto",
+            "categoria": "minerio",
+            "peso": 10.0,
+            "preco_base": 8.0,
+            "tempo_coleta": 8.0,
+            "cor": [
+                0,
+                0,
+                255
+            ],
+            "solido": true,
+            "respawn": true
+        },
+        {
+            "id": "arbusto",
+            "nome": "Arbusto",
+            "categoria": "planta",
+            "peso": 0.5,
+            "preco_base": 2.0,
+            "cor": [
+                55,
+                145,
+                75
+            ],
+            "solido": false,
+            "tempo_coleta": 2.0,
+            "respawn": true
+        }
+    ]
+}
