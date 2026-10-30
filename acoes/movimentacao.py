@@ -6,6 +6,9 @@ from acoes.colisao import Colisao
 
 
 class Movimentacao:
+    INTERVALO_REDUCAO_VELOCIDADE = 5.0
+    REDUCAO_VELOCIDADE = 0.10
+
 
     @staticmethod
     def atualizar(personagem, mapa, dt, minerios=None, inventario=None, objetos=None):
@@ -47,20 +50,17 @@ class Movimentacao:
 
         if inventario is not None:
             peso = inventario.peso_total
-            limite = inventario.PESO_MAXIMO
 
-            if limite > 0:
-                percentual = peso / limite
+            reducoes = int(
+                peso // Movimentacao.INTERVALO_REDUCAO_VELOCIDADE
+            )
 
-                if percentual > 0.80:
-                    multiplicador = 0.40
-                elif percentual > 0.60:
-                    multiplicador = 0.65
-                elif percentual > 0.30:
-                    multiplicador = 0.85
-
-                if percentual > 1.0:
-                    multiplicador = 0.0
+            multiplicador = max(
+                0.0,
+                1.0 - (
+                    reducoes * Movimentacao.REDUCAO_VELOCIDADE
+                )
+            )
 
         velocidade = personagem.velocidade * multiplicador
 

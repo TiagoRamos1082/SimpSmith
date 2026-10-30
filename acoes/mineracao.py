@@ -1,10 +1,11 @@
-﻿import pygame
+﻿
+import pygame
 
 
 class Mineracao:
     TECLA = pygame.K_e
     TEMPO_MINERACAO = 2.0
-    DISTANCIA_MAXIMA = 70
+    TAMANHO_SENSOR = 8
 
     LARGURA_BARRA = 300
     ALTURA_BARRA = 18
@@ -25,7 +26,7 @@ class Mineracao:
     def atualizar(self, dt, jogador, spawn):
         teclas = pygame.key.get_pressed()
 
-        # Depois de uma falha, exige soltar E antes de tentar novamente.
+        # Exige soltar E depois de uma falha.
         if not teclas[self.TECLA]:
             self._aguardando_soltar = False
             self.mensagem = ""
@@ -35,81 +36,112 @@ class Mineracao:
         if self._aguardando_soltar:
             return
 
-        minerio = self._encontrar_alvo(jogador, spawn)
-        if minerio is None:
+        recurso = self._encontrar_alvo(jogador, spawn)
+
+        if recurso is None:
             self._cancelar()
             return
 
-        if minerio is not self.alvo:
-            self.alvo = minerio
+        if recurso is not self.alvo:
+            self.alvo = recurso
             self.progresso = 0.0
 
         dados_item = self.inventario.catalogo.obter(self.alvo.tipo)
+
         if dados_item is None:
-            self.mensagem = f"Item '{self.alvo.tipo}' não existe no catálogo."
+            self.mensagem = (
+                f"Item '{self.alvo.tipo}' não existe no catálogo."
+            )
             self._aguardando_soltar = True
             self._cancelar()
             return
 
-        tempo = float(dados_item.get("tempo_coleta", self.TEMPO_MINERACAO))
+        tempo = float(
+            dados_item.get("tempo_coleta", self.TEMPO_MINERACAO)
+        )
+
         self.progresso += dt
 
         if self.progresso >= tempo:
-            tipo_minerio = self.alvo.tipo
-            if self.inventario.adicionar(tipo_minerio):
+            tipo_recurso = self.alvo.tipo
+
+            if self.inventario.adicionar(tipo_recurso):
                 spawn.minerar(self.alvo)
                 self.coleta_concluida = True
                 self.mensagem = ""
                 self._cancelar()
+                self._aguardando_soltar = True
             else:
-                self.mensagem = "Inventário cheio. Solte E para tentar novamente."
+                self.mensagem = (
+                    "Inventário cheio. Solte E para tentar novamente."
+                )
                 self._aguardando_soltar = True
                 self._cancelar()
 
     def _encontrar_alvo(self, jogador, spawn):
-        for minerio in spawn.minerios:
-            if self._esta_na_frente_e_encostando(jogador, minerio):
-                return minerio
-        return None
+        jogador_rect = jogador.rect
+        alvos_validos = []
 
-    def _esta_na_frente_e_encostando(self, jogador, minerio):
-        jogador_rect = pygame.Rect(
-            round(jogador.x) + 7,
-            round(jogador.y) + 5,
-            jogador.largura - 14,
-            jogador.altura - 7
-        )
-        minerio_rect = minerio.rect
-        tolerancia = 4
+        tamanho_sensor = self.TAMANHO_SENSOR
 
         if jogador.direcao == "up":
-            alinhado = (
-                jogador_rect.left < minerio_rect.right
-                and jogador_rect.right > minerio_rect.left
+            sensor = pygame.Rect(
+                jogador_rect.centerx - tamanho_sensor // 2,
+                jogador_rect.top - tamanho_sensor + 2,
+                tamanho_sensor,
+                tamanho_sensor
             )
-            encostando = abs(jogador_rect.top - minerio_rect.bottom) <= tolerancia
-        elif jogador.direcao == "down":
-            alinhado = (
-                jogador_rect.left < minerio_rect.right
-                and jogador_rect.right > minerio_rect.left
-            )
-            encostando = abs(jogador_rect.bottom - minerio_rect.top) <= tolerancia
-        elif jogador.direcao == "left":
-            alinhado = (
-                jogador_rect.top < minerio_rect.bottom
-                and jogador_rect.bottom > minerio_rect.top
-            )
-            encostando = abs(jogador_rect.left - minerio_rect.right) <= tolerancia
-        elif jogador.direcao == "right":
-            alinhado = (
-                jogador_rect.top < minerio_rect.bottom
-                and jogador_rect.bottom > minerio_rect.top
-            )
-            encostando = abs(jogador_rect.right - minerio_rect.left) <= tolerancia
-        else:
-            return False
 
-        return alinhado and encostando
+        elif jogador.direcao == "down":
+            sensor = pygame.Rect(
+                jogador_rect.centerx - tamanho_sensor // 2,
+                jogador_rect.bottom - 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        elif jogador.direcao == "left":
+            sensor = pygame.Rect(
+                jogador_rect.left - tamanho_sensor + 2,
+                jogador_rect.centery - tamanho_sensor // 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        elif jogador.direcao == "right":
+            sensor = pygame.Rect(
+                jogador_rect.right - 2,
+                jogador_rect.centery - tamanho_sensor // 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        else:
+            return None
+
+        for recurso in spawn.minerios:
+            recurso_rect = recurso.rect
+
+            encostando_ou_dentro = (
+                jogador_rect.left <= recurso_rect.right
+                and jogador_rect.right >= recurso_rect.left
+                and jogador_rect.top <= recurso_rect.bottom
+                and jogador_rect.bottom >= recurso_rect.top
+            )
+
+            olhando_para_recurso = sensor.colliderect(recurso_rect)
+
+            if encostando_ou_dentro and olhando_para_recurso:
+                dx = jogador_rect.centerx - recurso_rect.centerx
+                dy = jogador_rect.centery - recurso_rect.centery
+                distancia = dx ** 2 + dy ** 2
+
+                alvos_validos.append((distancia, recurso))
+
+        if not alvos_validos:
+            return None
+
+        return min(alvos_validos, key=lambda alvo: alvo[0])[1]
 
     def _cancelar(self):
         self.alvo = None
@@ -121,31 +153,92 @@ class Mineracao:
 
         largura = self.LARGURA_BARRA
         altura = self.ALTURA_BARRA
+
         x = (tela.get_width() - largura) // 2
         y = tela.get_height() - self.MARGEM_INFERIOR - altura
+
         fundo = pygame.Rect(x, y, largura, altura)
 
-        pygame.draw.rect(tela, self.COR_FUNDO, fundo, border_radius=8)
+        pygame.draw.rect(
+            tela,
+            self.COR_FUNDO,
+            fundo,
+            border_radius=8
+        )
 
         if self.alvo is not None:
-            dados_item = self.inventario.catalogo.obter(self.alvo.tipo)
-            tempo = float(dados_item.get("tempo_coleta", self.TEMPO_MINERACAO)) if dados_item else self.TEMPO_MINERACAO
+            dados_item = self.inventario.catalogo.obter(
+                self.alvo.tipo
+            )
+
+            tempo = (
+                float(dados_item.get("tempo_coleta", self.TEMPO_MINERACAO))
+                if dados_item
+                else self.TEMPO_MINERACAO
+            )
+
             percentual = min(self.progresso / tempo, 1.0)
+
             largura_preenchida = round(largura * percentual)
-            x_preenchimento = (tela.get_width() - largura_preenchida) // 2
-            preenchimento = pygame.Rect(x_preenchimento, y, largura_preenchida, altura)
+            x_preenchimento = (
+                tela.get_width() - largura_preenchida
+            ) // 2
+
+            preenchimento = pygame.Rect(
+                x_preenchimento,
+                y,
+                largura_preenchida,
+                altura
+            )
+
             if largura_preenchida > 0:
-                pygame.draw.rect(tela, self.COR_BARRA, preenchimento, border_radius=8)
+                pygame.draw.rect(
+                    tela,
+                    self.COR_BARRA,
+                    preenchimento,
+                    border_radius=8
+                )
+
+            mensagem = (
+                "Coletando..."
+                if self.alvo.categoria == "planta"
+                else "Minerando..."
+            )
 
             texto = pygame.font.Font(None, 24).render(
-                "Minerando...", True, (255, 255, 255)
+                mensagem,
+                True,
+                (0, 0, 0)
             )
-            tela.blit(texto, texto.get_rect(center=(tela.get_width() // 2, y - 18)))
 
-        pygame.draw.rect(tela, self.COR_BORDA, fundo, width=2, border_radius=8)
+            tela.blit(
+                texto,
+                texto.get_rect(
+                    center=(tela.get_width() // 2, y - 18)
+                )
+            )
+
+        pygame.draw.rect(
+            tela,
+            self.COR_BORDA,
+            fundo,
+            width=2,
+            border_radius=8
+        )
 
         if self.mensagem:
             texto = pygame.font.Font(None, 22).render(
-                self.mensagem, True, (255, 220, 120)
+                self.mensagem,
+                True,
+                (255, 220, 120)
             )
-            tela.blit(texto, texto.get_rect(center=(tela.get_width() // 2, y - 22)))
+
+            tela.blit(
+                texto,
+                texto.get_rect(
+                    center=(tela.get_width() // 2, y - 22)
+                )
+            )
+
+
+

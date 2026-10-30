@@ -3,6 +3,7 @@
 
 class Inventario:
     PESO_MAXIMO = 50.0
+    LIMITE_PILHA = 16
 
     def __init__(self, quantidade_slots, catalogo=None):
         self.catalogo = catalogo or CatalogoItens()
@@ -27,25 +28,66 @@ class Inventario:
 
     def adicionar(self, tipo, quantidade=1):
         item = self._dados_item(tipo)
+
         if item is None or quantidade <= 0:
             return False
 
-        # Primeiro, tenta acumular em uma pilha existente.
-        for slot in self.slots:
-            if slot is not None and slot["tipo"] == tipo:
-                slot["quantidade"] += quantidade
-                return True
+        peso_unitario = float(item.get("peso", 0))
 
-        # Se não existir pilha, procura um slot vazio.
+        if peso_unitario < 0:
+            return False
+
+        quantidade_restante = quantidade
+
+        # Calcula quantas unidades ainda cabem pelo peso.
+        if peso_unitario > 0:
+            peso_disponivel = max(
+                0,
+                self.PESO_MAXIMO - self.peso_total
+            )
+
+            limite_peso = int(
+                (peso_disponivel + 1e-9) / peso_unitario
+            )
+
+            quantidade_restante = min(
+                quantidade_restante,
+                limite_peso
+            )
+
+        if quantidade_restante <= 0:
+            return False
+
+        # Primeiro, completa pilhas existentes.
+        for slot in self.slots:
+            if (
+                slot is not None
+                and slot["tipo"] == tipo
+                and quantidade_restante > 0
+            ):
+                espaco = self.LIMITE_PILHA - slot["quantidade"]
+                adicionar = min(espaco, quantidade_restante)
+
+                if adicionar > 0:
+                    slot["quantidade"] += adicionar
+                    quantidade_restante -= adicionar
+
+        # Depois, ocupa slots vazios.
         for indice, slot in enumerate(self.slots):
-            if slot is None:
+            if slot is None and quantidade_restante > 0:
+                adicionar = min(
+                    self.LIMITE_PILHA,
+                    quantidade_restante
+                )
+
                 self.slots[indice] = {
                     "tipo": tipo,
-                    "quantidade": quantidade,
+                    "quantidade": adicionar,
                 }
-                return True
 
-        return False
+                quantidade_restante -= adicionar
+
+        return quantidade_restante < quantidade
 
     def mover(self, origem, destino):
         if origem == destino:
@@ -70,10 +112,24 @@ class Inventario:
             self.slots[origem],
         )
 
-    def descartar(self, indice):
+    def descartar(self, indice, quantidade=None):
         if not (0 <= indice < len(self.slots)):
             return False
-        if self.slots[indice] is None:
+
+        item = self.slots[indice]
+
+        if item is None:
             return False
-        self.slots[indice] = None
+
+        if quantidade is None:
+            quantidade = item["quantidade"]
+
+        if quantidade <= 0 or quantidade > item["quantidade"]:
+            return False
+
+        item["quantidade"] -= quantidade
+
+        if item["quantidade"] == 0:
+            self.slots[indice] = None
+
         return True
