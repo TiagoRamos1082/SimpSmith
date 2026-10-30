@@ -9,7 +9,7 @@ class InterfaceInventario:
     TAMANHO_SLOT = 64
     ESPACO = 8
 
-    COR_FUNDO = (30, 30, 35)
+    COR_FUNDO = (22, 22, 28)
     COR_SLOT = (65, 65, 75)
     COR_BORDA = (150, 150, 160)
     COR_TEXTO = (255, 255, 255)
@@ -21,8 +21,8 @@ class InterfaceInventario:
     def __init__(self):
         self.catalogo = CatalogoItens()
         self.aberto = False
-        self.fonte = pygame.font.Font(None, 24)
-        self.fonte_pequena = pygame.font.Font(None, 20)
+        self.fonte = pygame.font.SysFont("Segoe UI", 22, bold=True)
+        self.fonte_pequena = pygame.font.SysFont("Segoe UI", 18)
 
         self.slot_rects = []
         self.botao_descartar_rect = None
@@ -47,6 +47,16 @@ class InterfaceInventario:
         self.botao_mais = None
         self.botao_confirmar = None
         self.botao_cancelar = None
+
+        # Painel de detalhes do item.
+        self.detalhe_item_indice = None
+        self.detalhe_rect = None
+        self.painel_detalhes_rect = None
+        self.botao_fechar_detalhe = None
+        self.tela_atual = 'inventario'
+        self.botao_voltar_rect = None
+        self.inicio_animacao = 0
+        self.DURACAO_ANIMACAO = 250
 
     def tratar_evento(self, evento, inventario):
         if not self.aberto:
@@ -82,6 +92,18 @@ class InterfaceInventario:
         self.posicao_mouse = evento.pos
 
         if evento.type == pygame.MOUSEBUTTONDOWN:
+            if self.tela_atual in ("detalhes", "fechando_detalhes"):
+                if (
+                    self.tela_atual == "detalhes"
+                    and self.botao_voltar_rect
+                    and self.botao_voltar_rect.collidepoint(evento.pos)
+                ):
+                    self.tela_atual = "fechando_detalhes"
+                    self.inicio_animacao = pygame.time.get_ticks()
+                    self.botao_voltar_rect = None
+
+                return
+
             if self.quantidade_descartar is not None:
                 if self.botao_menos and self.botao_menos.collidepoint(evento.pos):
                     self.quantidade_descartar = max(
@@ -164,31 +186,15 @@ class InterfaceInventario:
 
                 return
 
-            if (
-                self.slot_selecionado is not None
-                and self.botao_descartar_rect
-                and self.botao_descartar_rect.collidepoint(evento.pos)
-            ):
-                self._abrir_modal(inventario)
-                return
-
             for indice, rect in enumerate(self.slot_rects):
                 if not rect.collidepoint(evento.pos):
                     continue
 
                 item = inventario.slots[indice]
 
-                if self.slot_selecionado is not None:
-                    origem_selecionada = self.slot_selecionado
-
-                    if indice != origem_selecionada:
-                        inventario.mover(origem_selecionada, indice)
-
-                    self.slot_selecionado = None
-                    self.ultimo_clique_slot = None
-                    return
-
                 if item is None:
+                    self.slot_selecionado = None
+                    self.detalhe_item_indice = None
                     self.ultimo_clique_slot = None
                     return
 
@@ -200,8 +206,12 @@ class InterfaceInventario:
                     <= self.TEMPO_CLIQUE_DUPLO
                 )
 
+                self.slot_selecionado = indice
+                self.detalhe_item_indice = indice
+
                 if clique_duplo:
-                    self.slot_selecionado = indice
+                    self.tela_atual = "detalhes"
+                    self.inicio_animacao = tempo_atual
                     self.ultimo_clique_slot = None
                 else:
                     self.ultimo_clique_slot = indice
@@ -231,6 +241,9 @@ class InterfaceInventario:
 
         if not self.aberto:
             self.slot_selecionado = None
+            self.detalhe_item_indice = None
+            self.tela_atual = 'inventario'
+            self.botao_voltar_rect = None
             self.ultimo_clique_slot = None
             self._fechar_modal()
 
@@ -251,32 +264,65 @@ class InterfaceInventario:
         largura_painel = largura_grade + 40
         altura_painel = altura_grade + 100
 
+        mostrando_detalhes = self.tela_atual in (
+            "detalhes", "fechando_detalhes"
+        )
+
+        largura_detalhes = 330
+        espacamento = 12
+
+        largura_total = largura_painel
+
+        if mostrando_detalhes:
+            largura_total += espacamento + largura_detalhes
+
+        inicio_x = (tela.get_width() - largura_total) // 2
+        inicio_y = (tela.get_height() - altura_painel) // 2
+
         painel = pygame.Rect(
-            (tela.get_width() - largura_painel) // 2,
-            (tela.get_height() - altura_painel) // 2,
+            inicio_x,
+            inicio_y,
             largura_painel,
-            altura_painel,
+            altura_painel
         )
 
         pygame.draw.rect(
             tela, self.COR_FUNDO, painel, border_radius=10
         )
-
         pygame.draw.rect(
             tela, self.COR_BORDA, painel,
             width=2, border_radius=10
         )
 
+        if mostrando_detalhes:
+            self.painel_detalhes_rect = pygame.Rect(
+                painel.right + espacamento,
+                inicio_y,
+                largura_detalhes,
+                altura_painel
+            )
+            self._desenhar_detalhes(tela, inventario)
+        else:
+            self.painel_detalhes_rect = None
+            self.botao_voltar_rect = None
+
+
         titulo = self.fonte.render(
             "INVENTARIO", True, self.COR_TEXTO
         )
 
-        tela.blit(titulo, (painel.x + 20, painel.y + 15))
+        tela.blit(
+            titulo,
+            titulo.get_rect(
+                center=(painel.centerx, painel.y + 27)
+            )
+        )
 
         inicio_x = painel.x + 20
         inicio_y = painel.y + 50
 
         self.slot_rects = []
+        tooltip_item = None
 
         for indice, item in enumerate(inventario.slots):
             coluna = indice % self.COLUNAS
@@ -317,8 +363,15 @@ class InterfaceInventario:
 
             if item is not None and indice != self.slot_arrastado:
                 self._desenhar_item(
-                    tela, item, x, y, tamanho=32
+                    tela, item, x, y, tamanho=34
                 )
+
+            if (
+                item is not None
+                and slot_rect.collidepoint(self.posicao_mouse)
+                and not self.arrastando
+            ):
+                tooltip_item = item
 
         # Desenha o item acompanhado pelo mouse.
         if self.arrastando and self.slot_arrastado is not None:
@@ -386,11 +439,180 @@ class InterfaceInventario:
             (x + 21, y + 17), (x + 21, y + 26), 2
         )
 
+        # Tooltip desenhado por ?ltimo, acima da grade.
+        if tooltip_item is not None and not self.arrastando:
+            self._desenhar_tooltip(tela, tooltip_item)
+
         # Modal de descarte.
         if self.quantidade_descartar is not None:
             self._desenhar_modal(tela, inventario)
 
+    def _desenhar_detalhes(self, tela, inventario):
+        indice = self.detalhe_item_indice
+        painel = self.painel_detalhes_rect
+
+        if painel is None:
+            return
+
+        if indice is None or not (0 <= indice < len(inventario.slots)):
+            return
+
+        item = inventario.slots[indice]
+
+        if item is None:
+            return
+
+        dados = self.catalogo.obter(item["tipo"])
+
+        if dados is None:
+            return
+
+        tempo_atual = pygame.time.get_ticks()
+        progresso = min(
+            1.0,
+            (tempo_atual - self.inicio_animacao)
+            / self.DURACAO_ANIMACAO
+        )
+
+        fechando = self.tela_atual == "fechando_detalhes"
+
+        if fechando:
+            progresso = 1 - progresso
+
+        # Suaviza??o da anima??o.
+        suavizado = progresso * progresso * (3 - 2 * progresso)
+
+        alpha = int(255 * suavizado)
+        deslocamento = int(35 * (1 - suavizado))
+
+        camada = pygame.Surface(
+            (painel.width, painel.height),
+            pygame.SRCALPHA
+        )
+
+        pygame.draw.rect(
+            camada,
+            (*self.COR_FUNDO, 255),
+            camada.get_rect(),
+            border_radius=10
+        )
+
+        pygame.draw.rect(
+            camada,
+            (*self.COR_BORDA, 255),
+            camada.get_rect(),
+            width=2,
+            border_radius=10
+        )
+
+        titulo = self.fonte.render(
+            "DETALHES", True, self.COR_TEXTO
+        )
+
+        camada.blit(
+            titulo,
+            titulo.get_rect(
+                center=(painel.width // 2, 27)
+            )
+        )
+
+        # ?cone do item.
+        icone = pygame.Rect(22, 65, 70, 70)
+
+        pygame.draw.rect(
+            camada,
+            dados.get("cor", (150, 150, 150)),
+            icone,
+            border_radius=8
+        )
+
+        nome = self.fonte.render(
+            dados["nome"], True, self.COR_DESTAQUE
+        )
+
+        camada.blit(
+            nome,
+            nome.get_rect(midleft=(105, icone.centery))
+        )
+
+        linhas = [
+            f"Categoria: {dados['categoria'].capitalize()}",
+            f"Preco base: R$ {dados.get('preco_base', 0):.2f}".replace(".", ","),
+            f"Peso: {dados.get('peso', 0):.2f} kg".replace(".", ","),
+            f"Tempo de coleta: {dados.get('tempo_coleta', 0):.1f} s".replace(".", ","),
+            f"Quantidade: {item['quantidade']}",
+        ]
+
+        y = 165
+
+        for linha in linhas:
+            texto = self.fonte_pequena.render(
+                linha, True, self.COR_TEXTO
+            )
+
+            camada.blit(
+                texto,
+                texto.get_rect(
+                    midleft=(22, y + texto.get_height() // 2)
+                )
+            )
+
+            y += 25
+
+        # Bot?o minimalista: c?rculo vermelho com X branco.
+        centro_x = painel.width - 27
+        centro_y = 27
+        raio = 11
+
+        pygame.draw.circle(
+            camada,
+            self.COR_DESCARTAR,
+            (centro_x, centro_y),
+            raio
+        )
+
+        pygame.draw.line(
+            camada,
+            self.COR_TEXTO,
+            (centro_x - 4, centro_y - 4),
+            (centro_x + 4, centro_y + 4),
+            2
+        )
+
+        pygame.draw.line(
+            camada,
+            self.COR_TEXTO,
+            (centro_x + 4, centro_y - 4),
+            (centro_x - 4, centro_y + 4),
+            2
+        )
+
+        # ?rea de clique acompanha a posi??o animada do painel.
+        posicao_x = painel.x + deslocamento
+
+        self.botao_voltar_rect = pygame.Rect(
+            posicao_x + centro_x - raio,
+            painel.y + centro_y - raio,
+            raio * 2,
+            raio * 2
+        )
+
+        camada.set_alpha(alpha)
+
+        tela.blit(
+            camada,
+            (posicao_x, painel.y)
+        )
+
+        if fechando and progresso <= 0:
+            self.tela_atual = "inventario"
+            self.botao_voltar_rect = None
+
     def _desenhar_modal(self, tela, inventario):
+
+
+
+
         largura, altura = 300, 170
 
         self.modal_rect = pygame.Rect(
@@ -531,19 +753,40 @@ class InterfaceInventario:
             border_radius=5
         )
 
-        quantidade = self.fonte_pequena.render(
-            str(item["quantidade"]),
+        fonte_quantidade = pygame.font.SysFont(
+            "Segoe UI", 13, bold=True
+        )
+
+        quantidade = fonte_quantidade.render(
+            f"{item['quantidade']}x",
             True,
             self.COR_TEXTO
         )
 
-        tela.blit(
-            quantidade,
-            (
-                x + self.TAMANHO_SLOT - quantidade.get_width() - 5,
-                y + self.TAMANHO_SLOT - quantidade.get_height() - 3
-            )
+        area_quantidade = quantidade.get_rect()
+        area_quantidade.bottomright = (
+            x + self.TAMANHO_SLOT - 4,
+            y + self.TAMANHO_SLOT - 4
         )
+
+        fundo_quantidade = pygame.Surface(
+            (area_quantidade.width + 8, area_quantidade.height + 4),
+            pygame.SRCALPHA
+        )
+
+        pygame.draw.rect(
+            fundo_quantidade,
+            (15, 15, 20, 145),
+            fundo_quantidade.get_rect(),
+            border_radius=4
+        )
+
+        tela.blit(
+            fundo_quantidade,
+            (area_quantidade.x - 4, area_quantidade.y - 2)
+        )
+
+        tela.blit(quantidade, area_quantidade)
 
     def _desenhar_tooltip(self, tela, item):
         dados_item = self.catalogo.obter(item["tipo"])
@@ -560,7 +803,7 @@ class InterfaceInventario:
         largura = texto.get_width() + 16
         altura = texto.get_height() + 12
 
-        mouse_x, mouse_y = pygame.mouse.get_pos()
+        mouse_x, mouse_y = self.posicao_mouse
 
         tooltip = pygame.Rect(
             mouse_x + 12,
