@@ -5,7 +5,7 @@ import pygame
 class Mineracao:
     TECLA = pygame.K_e
     TEMPO_MINERACAO = 2.0
-    DISTANCIA_MAXIMA = 0
+    DISTANCIA_MAXIMA = 8
 
     LARGURA_BARRA = 300
     ALTURA_BARRA = 18
@@ -79,8 +79,7 @@ class Mineracao:
                 self._cancelar()
 
     def _encontrar_alvo(self, jogador, spawn):
-        jogador_rect = jogador.rect.inflate(-14, -12)
-
+        jogador_rect = jogador.rect
         alvos_validos = []
 
         for recurso in spawn.minerios:
@@ -91,6 +90,7 @@ class Mineracao:
                     jogador_rect.left < recurso_rect.right
                     and jogador_rect.right > recurso_rect.left
                 )
+                esta_a_frente = recurso_rect.centery < jogador_rect.centery
                 distancia = jogador_rect.top - recurso_rect.bottom
 
             elif jogador.direcao == "down":
@@ -98,6 +98,7 @@ class Mineracao:
                     jogador_rect.left < recurso_rect.right
                     and jogador_rect.right > recurso_rect.left
                 )
+                esta_a_frente = recurso_rect.centery > jogador_rect.centery
                 distancia = recurso_rect.top - jogador_rect.bottom
 
             elif jogador.direcao == "left":
@@ -105,6 +106,7 @@ class Mineracao:
                     jogador_rect.top < recurso_rect.bottom
                     and jogador_rect.bottom > recurso_rect.top
                 )
+                esta_a_frente = recurso_rect.centerx < jogador_rect.centerx
                 distancia = jogador_rect.left - recurso_rect.right
 
             elif jogador.direcao == "right":
@@ -112,24 +114,25 @@ class Mineracao:
                     jogador_rect.top < recurso_rect.bottom
                     and jogador_rect.bottom > recurso_rect.top
                 )
+                esta_a_frente = recurso_rect.centerx > jogador_rect.centerx
                 distancia = recurso_rect.left - jogador_rect.right
 
             else:
                 continue
 
-            if not alinhado:
+            if not alinhado or not esta_a_frente:
                 continue
 
-            if distancia <= 4:
-                sobrepondo = jogador_rect.colliderect(recurso_rect)
+            distancia = max(0, distancia)
 
-                if sobrepondo or distancia >= 0:
-                    alvos_validos.append((max(0, distancia), recurso))
+            if distancia <= self.DISTANCIA_MAXIMA:
+                alvos_validos.append((distancia, recurso))
 
         if not alvos_validos:
             return None
 
         return min(alvos_validos, key=lambda alvo: alvo[0])[1]
+
 
     def _cancelar(self):
         self.alvo = None
@@ -196,7 +199,7 @@ class Mineracao:
             texto = pygame.font.Font(None, 24).render(
                 mensagem,
                 True,
-                (255, 255, 255)
+                (0, 0, 0)
             )
 
             tela.blit(

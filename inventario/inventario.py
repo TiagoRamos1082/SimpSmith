@@ -70,10 +70,24 @@ class Inventario:
             self.slots[origem],
         )
 
-    def descartar(self, indice):
+    def descartar(self, indice, quantidade=None):
         if not (0 <= indice < len(self.slots)):
             return False
-        if self.slots[indice] is None:
+
+        item = self.slots[indice]
+
+        if item is None:
             return False
-        self.slots[indice] = None
+
+        if quantidade is None:
+            quantidade = item["quantidade"]
+
+        if quantidade <= 0 or quantidade > item["quantidade"]:
+            return False
+
+        item["quantidade"] -= quantidade
+
+        if item["quantidade"] == 0:
+            self.slots[indice] = None
+
         return True
