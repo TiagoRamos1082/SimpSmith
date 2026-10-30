@@ -5,7 +5,7 @@ import pygame
 class Mineracao:
     TECLA = pygame.K_e
     TEMPO_MINERACAO = 2.0
-    DISTANCIA_MAXIMA = 8
+    TAMANHO_SENSOR = 8
 
     LARGURA_BARRA = 300
     ALTURA_BARRA = 18
@@ -82,57 +82,66 @@ class Mineracao:
         jogador_rect = jogador.rect
         alvos_validos = []
 
+        tamanho_sensor = self.TAMANHO_SENSOR
+
+        if jogador.direcao == "up":
+            sensor = pygame.Rect(
+                jogador_rect.centerx - tamanho_sensor // 2,
+                jogador_rect.top - tamanho_sensor + 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        elif jogador.direcao == "down":
+            sensor = pygame.Rect(
+                jogador_rect.centerx - tamanho_sensor // 2,
+                jogador_rect.bottom - 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        elif jogador.direcao == "left":
+            sensor = pygame.Rect(
+                jogador_rect.left - tamanho_sensor + 2,
+                jogador_rect.centery - tamanho_sensor // 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        elif jogador.direcao == "right":
+            sensor = pygame.Rect(
+                jogador_rect.right - 2,
+                jogador_rect.centery - tamanho_sensor // 2,
+                tamanho_sensor,
+                tamanho_sensor
+            )
+
+        else:
+            return None
+
         for recurso in spawn.minerios:
             recurso_rect = recurso.rect
 
-            if jogador.direcao == "up":
-                alinhado = (
-                    jogador_rect.left < recurso_rect.right
-                    and jogador_rect.right > recurso_rect.left
-                )
-                esta_a_frente = recurso_rect.centery < jogador_rect.centery
-                distancia = jogador_rect.top - recurso_rect.bottom
+            encostando_ou_dentro = (
+                jogador_rect.left <= recurso_rect.right
+                and jogador_rect.right >= recurso_rect.left
+                and jogador_rect.top <= recurso_rect.bottom
+                and jogador_rect.bottom >= recurso_rect.top
+            )
 
-            elif jogador.direcao == "down":
-                alinhado = (
-                    jogador_rect.left < recurso_rect.right
-                    and jogador_rect.right > recurso_rect.left
-                )
-                esta_a_frente = recurso_rect.centery > jogador_rect.centery
-                distancia = recurso_rect.top - jogador_rect.bottom
+            olhando_para_recurso = sensor.colliderect(recurso_rect)
 
-            elif jogador.direcao == "left":
-                alinhado = (
-                    jogador_rect.top < recurso_rect.bottom
-                    and jogador_rect.bottom > recurso_rect.top
-                )
-                esta_a_frente = recurso_rect.centerx < jogador_rect.centerx
-                distancia = jogador_rect.left - recurso_rect.right
+            if encostando_ou_dentro and olhando_para_recurso:
+                dx = jogador_rect.centerx - recurso_rect.centerx
+                dy = jogador_rect.centery - recurso_rect.centery
+                distancia = dx ** 2 + dy ** 2
 
-            elif jogador.direcao == "right":
-                alinhado = (
-                    jogador_rect.top < recurso_rect.bottom
-                    and jogador_rect.bottom > recurso_rect.top
-                )
-                esta_a_frente = recurso_rect.centerx > jogador_rect.centerx
-                distancia = recurso_rect.left - jogador_rect.right
-
-            else:
-                continue
-
-            if not alinhado or not esta_a_frente:
-                continue
-
-            distancia = max(0, distancia)
-
-            if distancia <= self.DISTANCIA_MAXIMA:
                 alvos_validos.append((distancia, recurso))
 
         if not alvos_validos:
             return None
 
         return min(alvos_validos, key=lambda alvo: alvo[0])[1]
-
 
     def _cancelar(self):
         self.alvo = None
@@ -230,3 +239,6 @@ class Mineracao:
                     center=(tela.get_width() // 2, y - 22)
                 )
             )
+
+
+

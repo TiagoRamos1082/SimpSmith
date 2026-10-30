@@ -193,17 +193,18 @@ def main():
 
                 spawn.atualizar(dt, jogador)
 
-                Movimentacao.atualizar(
-                    jogador,
-                    mapa,
-                    dt,
-                    spawn.minerios,
-                    inventario
-                )
-
                 mineracao.atualizar(
                     dt, jogador, spawn
                 )
+
+                if mineracao.alvo is None:
+                    Movimentacao.atualizar(
+                        jogador,
+                        mapa,
+                        dt,
+                        spawn.minerios,
+                        inventario
+                    )
 
             else:
                 jogador.andando = False
@@ -255,3 +256,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

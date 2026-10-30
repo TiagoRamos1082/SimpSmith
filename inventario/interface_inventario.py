@@ -35,6 +35,8 @@ class InterfaceInventario:
         self.slot_arrastado = None
         self.mouse_pressionado = False
         self.arrastando = False
+        self.escala_arraste = 1.0
+        self.ultimo_update_arraste = pygame.time.get_ticks()
         self.posicao_inicio_arraste = None
         self.LIMITE_ARRASTE = 6
 
@@ -373,20 +375,35 @@ class InterfaceInventario:
             ):
                 tooltip_item = item
 
-        # Desenha o item acompanhado pelo mouse.
-        if self.arrastando and self.slot_arrastado is not None:
-            item = inventario.slots[self.slot_arrastado]
+        # Anima o item ao se aproximar da lixeira.
+        if self.arrastando:
+            alvo = 1.0
 
-            if item is not None:
-                mouse_x, mouse_y = self.posicao_mouse
-
-                self._desenhar_item(
-                    tela,
-                    item,
-                    mouse_x - self.TAMANHO_SLOT // 2,
-                    mouse_y - self.TAMANHO_SLOT // 2,
-                    tamanho=32
+            if (
+                self.botao_descartar_rect
+                and self.botao_descartar_rect.collidepoint(
+                    self.posicao_mouse
                 )
+            ):
+                alvo = 0.45
+
+            agora = pygame.time.get_ticks()
+            delta = min(
+                50,
+                max(0, agora - self.ultimo_update_arraste)
+            )
+
+            fator = min(1.0, delta / 100)
+
+            self.escala_arraste += (
+                alvo - self.escala_arraste
+            ) * fator
+
+            self.ultimo_update_arraste = agora
+
+        else:
+            self.escala_arraste = 1.0
+            self.ultimo_update_arraste = pygame.time.get_ticks()
 
         # Botão de descarte.
         self.botao_descartar_rect = pygame.Rect(
@@ -439,6 +456,21 @@ class InterfaceInventario:
             (x + 21, y + 17), (x + 21, y + 26), 2
         )
 
+
+        # Desenha o item acompanhado pelo mouse.
+        if self.arrastando and self.slot_arrastado is not None:
+            item = inventario.slots[self.slot_arrastado]
+
+            if item is not None:
+                mouse_x, mouse_y = self.posicao_mouse
+
+                self._desenhar_item(
+                    tela,
+                    item,
+                    mouse_x - self.TAMANHO_SLOT // 2,
+                    mouse_y - self.TAMANHO_SLOT // 2,
+                    tamanho=max(8, round(32 * self.escala_arraste))
+                )
         # Tooltip desenhado por ?ltimo, acima da grade.
         if tooltip_item is not None and not self.arrastando:
             self._desenhar_tooltip(tela, tooltip_item)
@@ -753,8 +785,10 @@ class InterfaceInventario:
             border_radius=5
         )
 
+        tamanho_fonte = max(8, round(13 * tamanho / 32))
+
         fonte_quantidade = pygame.font.SysFont(
-            "Segoe UI", 13, bold=True
+            "Segoe UI", tamanho_fonte, bold=True
         )
 
         quantidade = fonte_quantidade.render(
