@@ -6,13 +6,13 @@ import pygame
 
 pygame.init()
 
-RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if RAIZ not in sys.path:
     sys.path.insert(0, RAIZ)
 
 from sistemas.catalogo_itens import CatalogoItens
 
-CAMINHO_IMAGEM = os.path.join(RAIZ, "assets", "mapa", "mapaPrincipal.png")
+CAMINHO_IMAGEM = os.path.join(RAIZ, "assets", "mapas", "mapaPrincipal.png")
 CAMINHO_AREAS = os.path.join(RAIZ, "mapa", "areas_minerios.json")
 
 if not os.path.isfile(CAMINHO_IMAGEM):

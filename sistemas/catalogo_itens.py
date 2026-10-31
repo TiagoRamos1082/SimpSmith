@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Caminho baseado na localização deste arquivo, não no diretório do terminal.
 RAIZ_PROJETO = Path(__file__).resolve().parent.parent
-CAMINHO_ITENS = RAIZ_PROJETO / "dados" / "itens.json"
+CAMINHO_ITENS = RAIZ_PROJETO / "dados" / "itens" / "itens.json"
 
 CATEGORIAS_VALIDAS = {"minerio", "planta", "material", "item"}
 

@@ -16,7 +16,7 @@ class Mapa:
         )
 
         caminho_imagem = os.path.join(
-            raiz, "assets", "mapa", "mapaPrincipal.png"
+            raiz, "assets", "mapas", "mapaPrincipal.png"
         )
 
         caminho_colisoes = os.path.join(

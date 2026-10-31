@@ -1,4 +1,4 @@
-
+﻿
 import pygame
 from pathlib import Path
 
@@ -9,7 +9,7 @@ class Personagem:
         self.y = float(y)
         self.velocidade = velocidade
 
-        # Dimensões do personagem
+        # DimensÃµes do personagem
         self.largura = 32
         self.altura = 40
 
@@ -17,7 +17,7 @@ class Personagem:
         self.direcao = "down"
         self.andando = False
 
-        # Animação
+        # AnimaÃ§Ã£o
         self.tempo_animacao = 0
         self.velocidade_animacao = 8
 
@@ -28,7 +28,7 @@ class Personagem:
         pasta = (
             Path(__file__).resolve().parent.parent
             / "assets"
-            / "player"
+            / "personagens" / "player"
         )
 
         arquivos = {
@@ -45,7 +45,7 @@ class Personagem:
 
             if not caminho.exists():
                 raise FileNotFoundError(
-                    f"Sprite não encontrado: {caminho}"
+                    f"Sprite nÃ£o encontrado: {caminho}"
                 )
 
             sheet = pygame.image.load(
@@ -76,7 +76,7 @@ class Personagem:
                     )
                 ).copy()
 
-                # Encontra os pixels visíveis.
+                # Encontra os pixels visÃ­veis.
                 limites = frame.get_bounding_rect()
 
                 canvas = pygame.Surface(
@@ -115,7 +115,7 @@ class Personagem:
                         self.largura - nova_largura
                     ) // 2
 
-                    # Alinha pela base dos pés.
+                    # Alinha pela base dos pÃ©s.
                     pos_y = (
                         self.altura - nova_altura
                     )
@@ -146,7 +146,7 @@ class Personagem:
         else:
             self.tempo_animacao = 0
 
-    def desenhar(self, tela):
+    def desenhar(self, tela, camera=None):
         frames = self.sprites[self.direcao]
 
         if self.andando:
@@ -159,40 +159,9 @@ class Personagem:
 
         sprite = frames[indice]
 
-        x = round(self.x)
-        y = round(self.y)
+        posicao = (round(self.x), round(self.y))
 
-        # Desenha o sprite.
-        tela.blit(sprite, (x, y))
+        if camera is not None:
+            posicao = camera.aplicar(posicao)
 
-        # # BORDA DE TESTE: área total do personagem.
-        # pygame.draw.rect(
-        #     tela,
-        #     (255, 0, 255),
-        #     (x, y, self.largura, self.altura),
-        #     1
-        # )
-
-        # # LINHA AMARELA: centro horizontal.
-        # pygame.draw.line(
-        #     tela,
-        #     (255, 255, 0),
-        #     (x + self.largura // 2, y),
-        #     (
-        #         x + self.largura // 2,
-        #         y + self.altura - 1
-        #     ),
-        #     1
-        # )
-
-        # # LINHA CIANO: base dos pés.
-        # pygame.draw.line(
-        #     tela,
-        #     (0, 255, 255),
-        #     (x, y + self.altura - 1),
-        #     (
-        #         x + self.largura - 1,
-        #         y + self.altura - 1
-        #     ),
-        #     1
-        # )
+        tela.blit(sprite, posicao)

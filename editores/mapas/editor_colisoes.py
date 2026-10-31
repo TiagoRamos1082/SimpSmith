@@ -5,10 +5,10 @@ import pygame
 
 pygame.init()
 
-RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CAMINHO_IMAGEM = os.path.join(
-    RAIZ, "assets", "mapa", "mapaPrincipal.png"
+    RAIZ, "assets", "mapas", "mapaPrincipal.png"
 )
 
 CAMINHO_COLISOES = os.path.join(

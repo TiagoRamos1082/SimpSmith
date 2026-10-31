@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-RAIZ_PROJETO = Path(__file__).resolve().parent.parent
+RAIZ_PROJETO = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(RAIZ_PROJETO))
 
 import tkinter as tk
