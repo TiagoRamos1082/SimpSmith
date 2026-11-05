@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 from pathlib import Path
 
 RAIZ_PROJETO = Path(__file__).resolve().parent.parent.parent
@@ -13,48 +13,323 @@ from sistemas.catalogo_itens import CatalogoItens, CATEGORIAS_VALIDAS
 class EditorItens:
     def __init__(self, janela):
         self.janela = janela
-        self.janela.title("SimpSmith — Editor de Itens")
+        self.janela.title("SimpSmith â€” Editor de Itens")
         self.janela.geometry("900x560")
+        self.janela.after(
+            100, lambda: self.janela.state("zoomed")
+        )
         self.catalogo = CatalogoItens()
         self.item_selecionado = None
-
+        self._configurar_estilo()
         self._montar_interface()
         self._atualizar_lista()
 
-    def _montar_interface(self):
-        principal = ttk.Frame(self.janela, padding=12)
-        principal.pack(fill="both", expand=True)
+    def _configurar_estilo(self):
+        self.cor_fundo = "#20232B"
+        self.cor_painel = "#292D36"
+        self.cor_campo = "#343842"
+        self.cor_texto = "#F0F0F0"
+        self.cor_secundaria = "#A5AAB5"
+        self.cor_destaque = "#7AA2F7"
 
-        painel_lista = ttk.Frame(principal)
-        painel_lista.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        self.janela.configure(bg=self.cor_fundo)
+        self.janela.geometry("1100x720")
+        self.janela.minsize(850, 600)
 
-        ttk.Label(painel_lista, text="Itens cadastrados").pack(anchor="w")
-        colunas = ("id", "nome", "categoria")
-        self.tabela = ttk.Treeview(
-            painel_lista, columns=colunas, show="headings", height=20
+        estilo = ttk.Style()
+        estilo.theme_use("clam")
+
+        estilo.configure(
+            "Simp.Treeview",
+            background=self.cor_painel,
+            foreground=self.cor_texto,
+            fieldbackground=self.cor_painel,
+            rowheight=32,
+            borderwidth=0,
+            font=("Segoe UI", 10)
         )
+
+        estilo.configure(
+            "Simp.Treeview.Heading",
+            background="#343842",
+            foreground=self.cor_texto,
+            font=("Segoe UI", 10, "bold"),
+            relief="flat"
+        )
+
+        estilo.map(
+            "Simp.Treeview",
+            background=[("selected", "#405477")],
+            foreground=[("selected", "#FFFFFF")]
+        )
+
+        estilo.configure(
+            "Simp.TCombobox",
+            fieldbackground=self.cor_campo,
+            background=self.cor_campo,
+            foreground=self.cor_texto,
+            arrowcolor=self.cor_texto
+        )
+
+        estilo.map(
+            "Simp.TCombobox",
+            fieldbackground=[("readonly", self.cor_campo)],
+            foreground=[("readonly", self.cor_texto)]
+        )
+
+        estilo.configure(
+            "Simp.TCheckbutton",
+            background=self.cor_painel,
+            foreground=self.cor_texto,
+            font=("Segoe UI", 9)
+        )
+
+        estilo.map(
+            "Simp.TCheckbutton",
+            background=[("active", self.cor_painel)]
+        )
+
+    def _voltar_central(self):
+        # A Central original permanece aberta em segundo plano.
+        self.janela.destroy()
+
+    def _montar_interface(self):
+        topo = tk.Frame(self.janela, bg=self.cor_fundo)
+        topo.pack(fill="x", padx=25, pady=(20, 12))
+
+        tk.Label(
+            topo,
+            text="Editor de Itens",
+            bg=self.cor_fundo,
+            fg=self.cor_texto,
+            font=("Segoe UI", 23, "bold")
+        ).pack(side="left")
+
+        tk.Button(
+            topo,
+            text="← VOLTAR À CENTRAL",
+            command=self._voltar_central,
+            bg=self.cor_painel,
+            fg=self.cor_texto,
+            activebackground="#454B59",
+            activeforeground="white",
+            relief="flat",
+            padx=14,
+            pady=9,
+            cursor="hand2",
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="right")
+
+        tk.Label(
+            self.janela,
+            text="GERENCIAMENTO DO CATÁLOGO DE ITENS",
+            bg=self.cor_fundo,
+            fg=self.cor_secundaria,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=27, pady=(0, 12))
+
+        tk.Frame(
+            self.janela,
+            bg="#414652",
+            height=1
+        ).pack(fill="x", padx=25)
+
+        principal = tk.Frame(self.janela, bg=self.cor_fundo)
+        principal.pack(fill="both", expand=True, padx=25, pady=18)
+
+        painel_lista = tk.Frame(
+            principal,
+            bg=self.cor_painel
+        )
+        painel_lista.pack(
+            side="left",
+            fill="both",
+            expand=True,
+            padx=(0, 14)
+        )
+
+        tk.Label(
+            painel_lista,
+            text="ITENS CADASTRADOS",
+            bg=self.cor_painel,
+            fg=self.cor_destaque,
+            font=("Segoe UI", 10, "bold")
+        ).pack(anchor="w", padx=16, pady=(16, 10))
+
+        tabela_container = tk.Frame(
+            painel_lista,
+            bg=self.cor_painel
+        )
+        tabela_container.pack(
+            fill="both",
+            expand=True,
+            padx=14,
+            pady=(0, 10)
+        )
+
+        colunas = ("id", "nome", "categoria")
+
+        self.tabela = ttk.Treeview(
+            tabela_container,
+            columns=colunas,
+            show="headings",
+            style="Simp.Treeview"
+        )
+
         self.tabela.heading("id", text="ID")
         self.tabela.heading("nome", text="Nome")
         self.tabela.heading("categoria", text="Categoria")
-        self.tabela.column("id", width=110)
-        self.tabela.column("nome", width=150)
-        self.tabela.column("categoria", width=100)
-        self.tabela.pack(fill="both", expand=True, pady=8)
-        self.tabela.bind("<<TreeviewSelect>>", self._selecionar_item)
 
-        botoes_lista = ttk.Frame(painel_lista)
-        botoes_lista.pack(fill="x")
-        ttk.Button(botoes_lista, text="Novo", command=self._limpar_formulario).pack(
-            side="left", padx=(0, 6)
-        )
-        ttk.Button(botoes_lista, text="Excluir", command=self._excluir_item).pack(
-            side="left"
+        self.tabela.column("id", width=150, minwidth=100)
+        self.tabela.column("nome", width=180, minwidth=120)
+        self.tabela.column("categoria", width=120, minwidth=90)
+
+        barra = ttk.Scrollbar(
+            tabela_container,
+            orient="vertical",
+            command=self.tabela.yview
         )
 
-        formulario = ttk.LabelFrame(principal, text="Dados do item", padding=12)
-        formulario.pack(side="right", fill="y")
+        self.tabela.configure(yscrollcommand=barra.set)
 
-        self.campos = {}
+        self.tabela.pack(side="left", fill="both", expand=True)
+        barra.pack(side="right", fill="y")
+
+        self.tabela.bind(
+            "<<TreeviewSelect>>",
+            self._selecionar_item
+        )
+
+        botoes_lista = tk.Frame(
+            painel_lista,
+            bg=self.cor_painel
+        )
+        botoes_lista.pack(fill="x", padx=14, pady=(0, 14))
+
+        tk.Button(
+            botoes_lista,
+            text="+ NOVO ITEM",
+            command=self._limpar_formulario,
+            bg=self.cor_destaque,
+            fg="#17191F",
+            activebackground="#91B4FF",
+            relief="flat",
+            padx=15,
+            pady=9,
+            cursor="hand2",
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left")
+
+        tk.Button(
+            botoes_lista,
+            text="EXCLUIR",
+            command=self._excluir_item,
+            bg=self.cor_campo,
+            fg=self.cor_texto,
+            activebackground="#454B59",
+            relief="flat",
+            padx=15,
+            pady=9,
+            cursor="hand2",
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=8)
+
+        # Painel de formulario com rolagem vertical
+        painel_formulario = tk.Frame(
+            principal,
+            bg=self.cor_painel,
+            width=410
+        )
+        painel_formulario.pack(side="right", fill="y")
+        painel_formulario.pack_propagate(False)
+
+        canvas_formulario = tk.Canvas(
+            painel_formulario,
+            bg=self.cor_painel,
+            highlightthickness=0,
+            width=390
+        )
+        canvas_formulario.pack(side="left", fill="both", expand=True)
+
+        barra_formulario = ttk.Scrollbar(
+            painel_formulario,
+            orient="vertical",
+            command=canvas_formulario.yview
+        )
+        barra_formulario.pack(side="right", fill="y")
+
+        canvas_formulario.configure(
+            yscrollcommand=barra_formulario.set
+        )
+
+        formulario = tk.Frame(
+            canvas_formulario,
+            bg=self.cor_painel
+        )
+
+        janela_formulario = canvas_formulario.create_window(
+            (0, 0),
+            window=formulario,
+            anchor="nw"
+        )
+
+        def atualizar_regiao_scroll(event=None):
+            canvas_formulario.configure(
+                scrollregion=canvas_formulario.bbox("all")
+            )
+
+        def ajustar_largura_formulario(event):
+            canvas_formulario.itemconfigure(
+                janela_formulario,
+                width=event.width
+            )
+
+        formulario.bind(
+            "<Configure>",
+            atualizar_regiao_scroll
+        )
+
+        canvas_formulario.bind(
+            "<Configure>",
+            ajustar_largura_formulario
+        )
+
+        def rolar_formulario(event):
+            widget = self.janela.winfo_containing(
+                event.x_root,
+                event.y_root
+            )
+
+            if widget is None:
+                return
+
+            if widget == canvas_formulario or str(widget).startswith(str(formulario)):
+                canvas_formulario.yview_scroll(
+                    int(-event.delta / 120),
+                    "units"
+                )
+
+        canvas_formulario.bind_all(
+            "<MouseWheel>",
+            rolar_formulario
+        )
+
+        self.janela.protocol(
+            "WM_DELETE_WINDOW",
+            lambda: (
+                canvas_formulario.unbind_all("<MouseWheel>"),
+                self.janela.destroy()
+            )
+        )
+
+        tk.Label(
+            formulario,
+            text="DADOS DO ITEM",
+            bg=self.cor_painel,
+            fg=self.cor_destaque,
+            font=("Segoe UI", 10, "bold")
+        ).pack(anchor="w", padx=18, pady=(17, 14))
+
         campos_texto = [
             ("id", "ID interno"),
             ("nome", "Nome de exibição"),
@@ -66,46 +341,108 @@ class EditorItens:
             ("cor_b", "Cor azul (0–255)"),
         ]
 
-        for linha, (chave, rotulo) in enumerate(campos_texto):
-            ttk.Label(formulario, text=rotulo).grid(
-                row=linha, column=0, sticky="w", pady=4
+        self.campos = {}
+
+        for chave, rotulo in campos_texto:
+            linha = tk.Frame(formulario, bg=self.cor_painel)
+            linha.pack(fill="x", padx=18, pady=4)
+
+            tk.Label(
+                linha,
+                text=rotulo,
+                bg=self.cor_painel,
+                fg=self.cor_secundaria,
+                font=("Segoe UI", 9)
+            ).pack(anchor="w")
+
+            entrada = tk.Entry(
+                linha,
+                bg=self.cor_campo,
+                fg=self.cor_texto,
+                insertbackground=self.cor_texto,
+                relief="flat",
+                font=("Segoe UI", 10)
             )
-            entrada = ttk.Entry(formulario, width=26)
-            entrada.grid(row=linha, column=1, sticky="ew", pady=4)
+            entrada.pack(fill="x", ipady=6, pady=(3, 0))
+
             self.campos[chave] = entrada
 
-        linha_categoria = len(campos_texto)
-        ttk.Label(formulario, text="Categoria").grid(
-            row=linha_categoria, column=0, sticky="w", pady=4
-        )
+        tk.Label(
+            formulario,
+            text="Categoria",
+            bg=self.cor_painel,
+            fg=self.cor_secundaria,
+            font=("Segoe UI", 9)
+        ).pack(anchor="w", padx=18, pady=(9, 3))
+
         self.categoria = ttk.Combobox(
             formulario,
             values=sorted(CATEGORIAS_VALIDAS),
             state="readonly",
-            width=23,
+            style="Simp.TCombobox"
         )
-        self.categoria.grid(row=linha_categoria, column=1, sticky="ew", pady=4)
+        self.categoria.pack(fill="x", padx=18, ipady=4)
         self.categoria.set("minerio")
 
         self.solido = tk.BooleanVar(value=True)
         self.respawn = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            formulario, text="Possui colisão sólida", variable=self.solido
-        ).grid(row=linha_categoria + 1, column=0, columnspan=2, sticky="w", pady=4)
-        ttk.Checkbutton(
-            formulario, text="Pode reaparecer (respawn)", variable=self.respawn
-        ).grid(row=linha_categoria + 2, column=0, columnspan=2, sticky="w", pady=4)
 
-        ttk.Button(
-            formulario, text="Salvar item", command=self._salvar_item
-        ).grid(
-            row=linha_categoria + 3, column=0, columnspan=2, sticky="ew", pady=(14, 4)
-        )
-        ttk.Label(
+        ttk.Checkbutton(
             formulario,
-            text="Ex.: ID 'cristal_azul'\nUse o ID no código e o nome na interface.",
-        ).grid(row=linha_categoria + 4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+            text="Possui colisão sólida",
+            variable=self.solido,
+            style="Simp.TCheckbutton"
+        ).pack(anchor="w", padx=18, pady=(12, 3))
 
+        ttk.Checkbutton(
+            formulario,
+            text="Pode reaparecer (respawn)",
+            variable=self.respawn,
+            style="Simp.TCheckbutton"
+        ).pack(anchor="w", padx=18, pady=3)
+
+        tk.Button(
+            formulario,
+            text="SALVAR ITEM",
+            command=self._salvar_item,
+            bg=self.cor_destaque,
+            fg="#17191F",
+            activebackground="#91B4FF",
+            relief="flat",
+            padx=12,
+            pady=11,
+            cursor="hand2",
+            font=("Segoe UI", 9, "bold")
+        ).pack(fill="x", padx=18, pady=(18, 8))
+
+        tk.Label(
+            formulario,
+            text="Use o ID no código e o nome na interface.",
+            bg=self.cor_painel,
+            fg=self.cor_secundaria,
+            font=("Segoe UI", 8),
+            wraplength=330
+        ).pack(anchor="w", padx=18, pady=(4, 12))
+
+        rodape = tk.Frame(self.janela, bg=self.cor_fundo)
+        rodape.pack(fill="x", padx=25, pady=(0, 16))
+
+        self.status = tk.Label(
+            rodape,
+            text="Editor de Itens pronto.",
+            bg=self.cor_fundo,
+            fg=self.cor_secundaria,
+            font=("Segoe UI", 9)
+        )
+        self.status.pack(side="left")
+
+        tk.Label(
+            rodape,
+            text="SimpSmith Tools",
+            bg=self.cor_fundo,
+            fg=self.cor_secundaria,
+            font=("Segoe UI", 9)
+        ).pack(side="right")
     def _atualizar_lista(self, selecionar_id=None):
         for linha in self.tabela.get_children():
             self.tabela.delete(linha)
@@ -195,7 +532,7 @@ class EditorItens:
             }
         except ValueError as erro:
             raise ValueError(
-                "Verifique se peso, preço, tempo e valores RGB são números válidos."
+                "Verifique se peso, preÃ§o, tempo e valores RGB sÃ£o nÃºmeros vÃ¡lidos."
             ) from erro
 
     def _salvar_item(self):
@@ -211,19 +548,19 @@ class EditorItens:
             self._atualizar_lista(item["id"])
             messagebox.showinfo("Sucesso", "Item salvo com sucesso.")
         except (ValueError, OSError) as erro:
-            messagebox.showerror("Não foi possível salvar", str(erro))
+            messagebox.showerror("NÃ£o foi possÃ­vel salvar", str(erro))
 
     def _excluir_item(self):
         selecionados = self.tabela.selection()
         if not selecionados:
-            messagebox.showwarning("Atenção", "Selecione um item para excluir.")
+            messagebox.showwarning("AtenÃ§Ã£o", "Selecione um item para excluir.")
             return
 
         item_id = selecionados[0]
         confirmar = messagebox.askyesno(
-            "Confirmar exclusão",
-            f"Deseja excluir '{item_id}' do catálogo?\n"
-            "Isso não remove automaticamente referências em áreas do mapa ou receitas."
+            "Confirmar exclusÃ£o",
+            f"Deseja excluir '{item_id}' do catÃ¡logo?\n"
+            "Isso nÃ£o remove automaticamente referÃªncias em Ã¡reas do mapa ou receitas."
         )
         if not confirmar:
             return
@@ -233,7 +570,7 @@ class EditorItens:
             self._limpar_formulario()
             self._atualizar_lista()
         except (ValueError, OSError) as erro:
-            messagebox.showerror("Não foi possível excluir", str(erro))
+            messagebox.showerror("NÃ£o foi possÃ­vel excluir", str(erro))
 
 
 def main():
@@ -244,3 +581,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

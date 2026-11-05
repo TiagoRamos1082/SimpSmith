@@ -89,6 +89,51 @@ class Inventario:
 
         return quantidade_restante < quantidade
 
+    
+    def quantidade_disponivel(self, tipo):
+        quantidade_total = 0
+
+        for slot in self.slots:
+            if slot is not None and slot["tipo"] == tipo:
+                quantidade_total += slot["quantidade"]
+
+        return quantidade_total
+
+    def remover(self, tipo, quantidade=1):
+        if (
+            not isinstance(quantidade, int)
+            or isinstance(quantidade, bool)
+            or quantidade <= 0
+        ):
+            return False
+
+        if self.quantidade_disponivel(tipo) < quantidade:
+            return False
+
+        quantidade_restante = quantidade
+
+        for indice, slot in enumerate(self.slots):
+            if slot is None or slot["tipo"] != tipo:
+                continue
+
+            remover = min(
+                slot["quantidade"],
+                quantidade_restante
+            )
+
+            slot["quantidade"] -= remover
+            quantidade_restante -= remover
+
+            if slot["quantidade"] == 0:
+                self.slots[indice] = None
+
+            if quantidade_restante == 0:
+                break
+
+        return True
+
+
+
     def mover(self, origem, destino):
         if origem == destino:
             return

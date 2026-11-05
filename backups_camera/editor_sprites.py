@@ -1,0 +1,375 @@
+﻿import pygame
+from pathlib import Path
+
+
+RAIZ = Path(__file__).resolve().parents[2]
+
+ORIGEM = RAIZ / "assets" / "tiles" / "spritesheet_original.png"
+DESTINO = RAIZ / "assets" / "tiles"
+
+TAMANHO_CELULA = 12
+
+CATEGORIAS = {
+    pygame.K_1: "terreno",
+    pygame.K_2: "superior",
+    pygame.K_3: "objetos"
+}
+
+
+class EditorSprites:
+    def __init__(self):
+        pygame.init()
+
+        info = pygame.display.Info()
+        self.largura = min(1200, info.current_w)
+        self.altura = min(760, info.current_h)
+
+        self.tela = pygame.display.set_mode(
+            (self.largura, self.altura)
+        )
+        pygame.display.set_caption("SimpSmith - Editor de Sprites")
+
+        self.fonte = pygame.font.Font(None, 25)
+        self.fonte_pequena = pygame.font.Font(None, 20)
+
+        self.relogio = pygame.time.Clock()
+        self.executando = True
+
+        self.imagem = pygame.image.load(str(ORIGEM)).convert_alpha()
+
+        self.imagem_largura, self.imagem_altura = self.imagem.get_size()
+
+        self.colunas = self.imagem_largura // TAMANHO_CELULA
+        self.linhas = self.imagem_altura // TAMANHO_CELULA
+
+        self.escala = min(
+            1.5,
+            (self.altura - 100) / self.imagem_altura
+        )
+
+        self.visual_largura = int(self.imagem_largura * self.escala)
+        self.visual_altura = int(self.imagem_altura * self.escala)
+
+        self.origem_x = 20
+        self.origem_y = 65
+
+        self.imagem_visual = pygame.transform.scale(
+            self.imagem,
+            (self.visual_largura, self.visual_altura)
+        )
+
+        self.selecao_inicio = None
+        self.selecao_fim = None
+        self.selecionando = False
+
+        self.categoria = "terreno"
+        self.nome = "novo_sprite"
+        self.editando_nome = False
+
+        self.mensagem = "Arraste o mouse para selecionar uma regiao."
+
+    def desenhar_texto(self, texto, x, y, fonte=None, cor=(240, 240, 240)):
+        fonte = fonte or self.fonte
+        imagem = fonte.render(texto, True, cor)
+        self.tela.blit(imagem, (x, y))
+
+    def obter_celula(self, posicao):
+        mx, my = posicao
+
+        x = (mx - self.origem_x) / (TAMANHO_CELULA * self.escala)
+        y = (my - self.origem_y) / (TAMANHO_CELULA * self.escala)
+
+        if not (0 <= x < self.colunas and 0 <= y < self.linhas):
+            return None
+
+        return int(x), int(y)
+
+    def obter_selecao(self):
+        if self.selecao_inicio is None or self.selecao_fim is None:
+            return None
+
+        x1, y1 = self.selecao_inicio
+        x2, y2 = self.selecao_fim
+
+        esquerda = min(x1, x2)
+        topo = min(y1, y2)
+
+        direita = max(x1, x2) + 1
+        baixo = max(y1, y2) + 1
+
+        return esquerda, topo, direita, baixo
+
+    def desenhar_grade(self):
+        tamanho = TAMANHO_CELULA * self.escala
+
+        for x in range(self.colunas + 1):
+            px = self.origem_x + int(x * tamanho)
+            pygame.draw.line(
+                self.tela, (70, 70, 70),
+                (px, self.origem_y),
+                (px, self.origem_y + self.visual_altura)
+            )
+
+        for y in range(self.linhas + 1):
+            py = self.origem_y + int(y * tamanho)
+            pygame.draw.line(
+                self.tela, (70, 70, 70),
+                (self.origem_x, py),
+                (self.origem_x + self.visual_largura, py)
+            )
+
+    def desenhar_selecao(self):
+        selecao = self.obter_selecao()
+
+        if selecao is None:
+            return
+
+        x1, y1, x2, y2 = selecao
+        tamanho = TAMANHO_CELULA * self.escala
+
+        rect = pygame.Rect(
+            self.origem_x + int(x1 * tamanho),
+            self.origem_y + int(y1 * tamanho),
+            int((x2 - x1) * tamanho),
+            int((y2 - y1) * tamanho)
+        )
+
+        pygame.draw.rect(self.tela, (255, 210, 50), rect, 3)
+
+    def desenhar_painel(self):
+        painel_x = self.origem_x + self.visual_largura + 25
+
+        pygame.draw.rect(
+            self.tela,
+            (48, 48, 55),
+            (painel_x, 0, self.largura - painel_x, self.altura)
+        )
+
+        self.desenhar_texto(
+            "EDITOR DE SPRITES", painel_x + 15, 25
+        )
+
+        self.desenhar_texto(
+            "SPRITESHEET", painel_x + 15, 75,
+            self.fonte_pequena, (180, 180, 180)
+        )
+
+        self.desenhar_texto(
+            f"{self.imagem_largura} x {self.imagem_altura} px",
+            painel_x + 15, 100, self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            f"Grade: {self.colunas} x {self.linhas}",
+            painel_x + 15, 125, self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            f"Celula: {TAMANHO_CELULA} x {TAMANHO_CELULA}",
+            painel_x + 15, 150, self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            "SELECAO", painel_x + 15, 205
+        )
+
+        selecao = self.obter_selecao()
+
+        if selecao:
+            x1, y1, x2, y2 = selecao
+            largura = x2 - x1
+            altura = y2 - y1
+
+            self.desenhar_texto(
+                f"Colunas: {largura}",
+                painel_x + 15, 240, self.fonte_pequena
+            )
+            self.desenhar_texto(
+                f"Linhas: {altura}",
+                painel_x + 15, 265, self.fonte_pequena
+            )
+            self.desenhar_texto(
+                f"Pixels: {largura * 12} x {altura * 12}",
+                painel_x + 15, 290, self.fonte_pequena
+            )
+        else:
+            self.desenhar_texto(
+                "Nenhuma regiao selecionada.",
+                painel_x + 15, 240, self.fonte_pequena
+            )
+
+        self.desenhar_texto(
+            "CATEGORIA", painel_x + 15, 345
+        )
+        self.desenhar_texto(
+            f"[1] Terreno: {'*' if self.categoria == 'terreno' else ''}",
+            painel_x + 15, 375, self.fonte_pequena
+        )
+        self.desenhar_texto(
+            f"[2] Superior: {'*' if self.categoria == 'superior' else ''}",
+            painel_x + 15, 400, self.fonte_pequena
+        )
+        self.desenhar_texto(
+            f"[3] Objetos: {'*' if self.categoria == 'objetos' else ''}",
+            painel_x + 15, 425, self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            "NOME DO SPRITE", painel_x + 15, 475
+        )
+
+        cor_nome = (255, 210, 50) if self.editando_nome else (240, 240, 240)
+
+        self.desenhar_texto(
+            self.nome, painel_x + 15, 505,
+            self.fonte_pequena, cor_nome
+        )
+
+        self.desenhar_texto(
+            "[F2] Editar nome",
+            painel_x + 15, 555, self.fonte_pequena
+        )
+        self.desenhar_texto(
+            "[ENTER] Exportar",
+            painel_x + 15, 580, self.fonte_pequena
+        )
+        self.desenhar_texto(
+            "[R] Limpar selecao",
+            painel_x + 15, 605, self.fonte_pequena
+        )
+        self.desenhar_texto(
+            "[ESC] Sair",
+            painel_x + 15, 630, self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            self.mensagem,
+            painel_x + 15, self.altura - 45,
+            self.fonte_pequena, (255, 210, 50)
+        )
+
+    def exportar(self):
+        selecao = self.obter_selecao()
+
+        if selecao is None:
+            self.mensagem = "Selecione uma regiao primeiro."
+            return
+
+        nome = self.nome.strip()
+
+        if not nome or nome in (".", ".."):
+            self.mensagem = "Digite um nome valido."
+            return
+
+        if any(caractere in nome for caractere in '\\/:*?"<>|'):
+            self.mensagem = "Nome contem caracteres invalidos."
+            return
+
+        x1, y1, x2, y2 = selecao
+
+        area = pygame.Rect(
+            x1 * TAMANHO_CELULA,
+            y1 * TAMANHO_CELULA,
+            (x2 - x1) * TAMANHO_CELULA,
+            (y2 - y1) * TAMANHO_CELULA
+        )
+
+        recorte = self.imagem.subsurface(area).copy()
+
+        pasta = DESTINO / self.categoria
+        pasta.mkdir(parents=True, exist_ok=True)
+
+        caminho = pasta / f"{nome}.png"
+
+        if caminho.exists():
+            self.mensagem = "Ja existe um sprite com esse nome."
+            return
+
+        pygame.image.save(recorte, str(caminho))
+
+        self.mensagem = (
+            f"Exportado: {self.categoria}/{nome}.png"
+        )
+
+    def tratar_eventos(self):
+        for evento in pygame.event.get():
+
+            if evento.type == pygame.QUIT:
+                self.executando = False
+
+            elif evento.type == pygame.KEYDOWN:
+
+                if self.editando_nome:
+                    if evento.key == pygame.K_RETURN:
+                        self.editando_nome = False
+                    elif evento.key == pygame.K_BACKSPACE:
+                        self.nome = self.nome[:-1]
+                    elif evento.key == pygame.K_ESCAPE:
+                        self.editando_nome = False
+                    continue
+
+                if evento.key == pygame.K_ESCAPE:
+                    self.executando = False
+
+                elif evento.key == pygame.K_r:
+                    self.selecao_inicio = None
+                    self.selecao_fim = None
+                    self.mensagem = "Selecao limpa."
+
+                elif evento.key == pygame.K_F2:
+                    self.editando_nome = True
+                    self.mensagem = "Digite o nome e pressione Enter."
+
+                elif evento.key == pygame.K_RETURN:
+                    self.exportar()
+
+                elif evento.key in CATEGORIAS:
+                    self.categoria = CATEGORIAS[evento.key]
+
+            elif evento.type == pygame.TEXTINPUT:
+                if self.editando_nome:
+                    self.nome += evento.text
+
+            elif evento.type == pygame.MOUSEBUTTONDOWN:
+                if evento.button == 1:
+                    celula = self.obter_celula(evento.pos)
+
+                    if celula is not None:
+                        self.selecao_inicio = celula
+                        self.selecao_fim = celula
+                        self.selecionando = True
+
+            elif evento.type == pygame.MOUSEMOTION:
+                if self.selecionando:
+                    celula = self.obter_celula(evento.pos)
+
+                    if celula is not None:
+                        self.selecao_fim = celula
+
+            elif evento.type == pygame.MOUSEBUTTONUP:
+                if evento.button == 1:
+                    self.selecionando = False
+
+    def executar(self):
+        while self.executando:
+            self.relogio.tick(60)
+            self.tratar_eventos()
+
+            self.tela.fill((35, 35, 40))
+
+            self.tela.blit(
+                self.imagem_visual,
+                (self.origem_x, self.origem_y)
+            )
+
+            self.desenhar_grade()
+            self.desenhar_selecao()
+            self.desenhar_painel()
+
+            pygame.display.flip()
+
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    EditorSprites().executar()

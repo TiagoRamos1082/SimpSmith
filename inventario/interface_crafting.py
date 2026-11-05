@@ -8,20 +8,59 @@ class InterfaceCrafting:
 
         self.fonte_titulo = pygame.font.Font(None, 42)
         self.fonte_texto = pygame.font.Font(None, 28)
+        self.fonte_detalhe = pygame.font.Font(None, 23)
 
         self.largura = 700
         self.altura = 500
 
+        self.receitas = []
+        self.selecionada = 0
+        self.mensagem = ""
+
     def alternar(self):
         self.aberto = not self.aberto
 
-    def tratar_evento(self, evento):
+        if self.aberto:
+            self.selecionada = 0
+            self.mensagem = ""
+
+    def configurar_receitas(self, receitas):
+        self.receitas = receitas
+        self.selecionada = 0
+
+    def tratar_evento(self, evento, crafting=None):
         if not self.aberto:
             return
 
-        if evento.type == pygame.KEYDOWN:
-            if evento.key == pygame.K_ESCAPE:
-                self.aberto = False
+        if evento.type != pygame.KEYDOWN:
+            return
+
+        if evento.key == pygame.K_ESCAPE:
+            self.aberto = False
+            return
+
+        if not self.receitas:
+            return
+
+        if evento.key == pygame.K_UP:
+            self.selecionada = (
+                self.selecionada - 1
+            ) % len(self.receitas)
+
+        elif evento.key == pygame.K_DOWN:
+            self.selecionada = (
+                self.selecionada + 1
+            ) % len(self.receitas)
+
+        elif evento.key == pygame.K_RETURN and crafting is not None:
+            receita = self.receitas[self.selecionada]
+
+            sucesso = crafting.fabricar(receita["id"])
+
+            if sucesso:
+                self.mensagem = "Fabricacao realizada com sucesso!"
+            else:
+                self.mensagem = "Materiais insuficientes ou inventario cheio."
 
     def desenhar(self, tela):
         if not self.aberto:
@@ -29,7 +68,6 @@ class InterfaceCrafting:
 
         largura_tela, altura_tela = tela.get_size()
 
-        # Fundo escurecido.
         fundo = pygame.Surface(
             (largura_tela, altura_tela),
             pygame.SRCALPHA
@@ -60,33 +98,96 @@ class InterfaceCrafting:
         )
 
         titulo = self.fonte_titulo.render(
-            "Bancada de Crafting",
+            "Fornalha",
             True,
             (255, 255, 255)
         )
+        tela.blit(titulo, (painel.x + 25, painel.y + 20))
 
-        tela.blit(
-            titulo,
-            (painel.x + 25, painel.y + 20)
-        )
+        if not self.receitas:
+            texto = self.fonte_texto.render(
+                "Nenhuma receita disponivel.",
+                True,
+                (190, 190, 190)
+            )
+            tela.blit(texto, (painel.x + 25, painel.y + 100))
 
-        texto = self.fonte_texto.render(
-            "Receitas disponiveis aparecerao aqui.",
-            True,
-            (190, 190, 190)
-        )
+        else:
+            receita = self.receitas[self.selecionada]
 
-        tela.blit(
-            texto,
-            (painel.x + 25, painel.y + 100)
-        )
+            nome = self.fonte_texto.render(
+                receita["nome"],
+                True,
+                (255, 210, 120)
+            )
+            tela.blit(nome, (painel.x + 25, painel.y + 90))
 
-        instrucao = self.fonte_texto.render(
-            "ESC - Fechar",
+            y = painel.y + 145
+
+            texto = self.fonte_texto.render(
+                "Ingredientes:",
+                True,
+                (255, 255, 255)
+            )
+            tela.blit(texto, (painel.x + 25, y))
+
+            y += 35
+
+            for item, quantidade in receita["ingredientes"].items():
+                linha = self.fonte_detalhe.render(
+                    f"{item}: {quantidade}",
+                    True,
+                    (190, 190, 190)
+                )
+                tela.blit(linha, (painel.x + 45, y))
+                y += 27
+
+            y += 15
+
+            texto = self.fonte_texto.render(
+                "Resultado:",
+                True,
+                (255, 255, 255)
+            )
+            tela.blit(texto, (painel.x + 25, y))
+
+            y += 35
+
+            for item, quantidade in receita["resultado"].items():
+                linha = self.fonte_detalhe.render(
+                    f"{item}: {quantidade}",
+                    True,
+                    (150, 220, 150)
+                )
+                tela.blit(linha, (painel.x + 45, y))
+                y += 27
+
+            navegacao = self.fonte_detalhe.render(
+                f"Receita {self.selecionada + 1}/{len(self.receitas)}",
+                True,
+                (190, 190, 190)
+            )
+            tela.blit(
+                navegacao,
+                (painel.right - 180, painel.y + 90)
+            )
+
+        if self.mensagem:
+            mensagem = self.fonte_detalhe.render(
+                self.mensagem,
+                True,
+                (150, 220, 150)
+            )
+            tela.blit(
+                mensagem,
+                (painel.x + 25, painel.bottom - 90)
+            )
+
+        instrucao = self.fonte_detalhe.render(
+            "SETAS: Selecionar | ENTER: Fabricar | ESC: Fechar",
             True,
             (160, 160, 160)
         )
-
         tela.blit(
             instrucao,
             (painel.x + 25, painel.bottom - 45)

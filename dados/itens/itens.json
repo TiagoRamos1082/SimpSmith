@@ -89,6 +89,21 @@
       "solido": false,
       "tempo_coleta": 2.0,
       "respawn": true
+    },
+    {
+      "id": "barra_ferro",
+      "nome": "Barra de Ferro",
+      "categoria": "material",
+      "peso": 5.0,
+      "preco_base": 12.0,
+      "cor": [
+        180,
+        180,
+        190
+      ],
+      "solido": false,
+      "tempo_coleta": 2.0,
+      "respawn": false
     }
   ]
 }

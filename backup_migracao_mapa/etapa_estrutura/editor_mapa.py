@@ -1,0 +1,395 @@
+
+import json
+import pygame
+from pathlib import Path
+
+
+RAIZ = Path(__file__).resolve().parents[2]
+CAMINHO_MAPA = RAIZ / "dados" / "mapas" / "mapa_principal.json"
+
+LARGURA_JANELA = 1200
+ALTURA_JANELA = 760
+
+TAMANHO_TILE = 32
+ESCALA = 20
+
+POSICAO_MAPA_X = 20
+POSICAO_MAPA_Y = 60
+
+COR_FUNDO = (35, 35, 40)
+COR_PAINEL = (48, 48, 55)
+COR_GRADE = (20, 20, 20)
+COR_TEXTO = (240, 240, 240)
+COR_SELECAO = (255, 210, 50)
+
+
+class EditorMapa:
+    def __init__(self):
+        pygame.init()
+
+        self.tela = pygame.display.set_mode(
+            (LARGURA_JANELA, ALTURA_JANELA)
+        )
+        pygame.display.set_caption("SimpSmith - Editor de Mapas")
+
+        self.fonte = pygame.font.Font(None, 25)
+        self.fonte_pequena = pygame.font.Font(None, 20)
+
+        self.relogio = pygame.time.Clock()
+        self.executando = True
+
+        self.carregar_mapa()
+
+        self.camadas = list(self.dados["camadas"].keys())
+        self.indice_camada = 0
+
+        self.tiles = self.dados["tiles"]
+        self.tile_selecionado = next(iter(self.tiles))
+
+        self.modo = "pintura"
+
+        self.salvar_mensagem = ""
+
+    @property
+    def camada_atual(self):
+        return self.camadas[self.indice_camada]
+
+    def carregar_mapa(self):
+        with CAMINHO_MAPA.open("r", encoding="utf-8-sig") as arquivo:
+            self.dados = json.load(arquivo)
+
+        self.largura = self.dados["largura"]
+        self.altura = self.dados["altura"]
+        self.tile_size = self.dados["tile_size"]
+
+    def salvar_mapa(self):
+        try:
+            with CAMINHO_MAPA.open("w", encoding="utf-8") as arquivo:
+                json.dump(
+                    self.dados,
+                    arquivo,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+            self.salvar_mensagem = "Mapa salvo com sucesso!"
+
+        except OSError as erro:
+            self.salvar_mensagem = f"Erro ao salvar: {erro}"
+
+    def obter_posicao_tile(self, posicao_mouse):
+        mouse_x, mouse_y = posicao_mouse
+
+        x = (mouse_x - POSICAO_MAPA_X) // ESCALA
+        y = (mouse_y - POSICAO_MAPA_Y) // ESCALA
+
+        if 0 <= x < self.largura and 0 <= y < self.altura:
+            return int(x), int(y)
+
+        return None
+
+    def pintar_tile(self, x, y):
+        self.dados["camadas"][self.camada_atual][y][x] = (
+            self.tile_selecionado
+        )
+
+    def posicionar_spawn(self, x, y):
+        self.dados["spawn_jogador"] = {
+            "x": x * self.tile_size,
+            "y": y * self.tile_size,
+            "direcao": "down"
+        }
+
+        self.salvar_mensagem = "Spawn atualizado!"
+
+    def desenhar_texto(self, texto, x, y, fonte=None):
+        fonte = fonte or self.fonte
+
+        imagem = fonte.render(
+            texto,
+            True,
+            COR_TEXTO
+        )
+
+        self.tela.blit(imagem, (x, y))
+
+    def desenhar_mapa(self):
+        tamanho = ESCALA
+
+        for y in range(self.altura):
+            for x in range(self.largura):
+                cor = None
+
+                # Desenha as camadas na ordem definida no JSON.
+                for nome_camada in self.camadas:
+                    identificador = (
+                        self.dados["camadas"][nome_camada][y][x]
+                    )
+
+                    if identificador is not None:
+                        cor = self.tiles[identificador]["cor"]
+
+                if cor is None:
+                    cor = COR_FUNDO
+
+                rect = pygame.Rect(
+                    POSICAO_MAPA_X + x * tamanho,
+                    POSICAO_MAPA_Y + y * tamanho,
+                    tamanho,
+                    tamanho
+                )
+
+                pygame.draw.rect(self.tela, cor, rect)
+                pygame.draw.rect(
+                    self.tela,
+                    COR_GRADE,
+                    rect,
+                    1
+                )
+
+        self.desenhar_spawn()
+
+    def desenhar_spawn(self):
+        spawn = self.dados.get("spawn_jogador")
+
+        if spawn is None:
+            return
+
+        x = spawn["x"] // self.tile_size
+        y = spawn["y"] // self.tile_size
+
+        centro_x = POSICAO_MAPA_X + x * ESCALA + ESCALA // 2
+        centro_y = POSICAO_MAPA_Y + y * ESCALA + ESCALA // 2
+
+        pygame.draw.circle(
+            self.tela,
+            (255, 220, 40),
+            (centro_x, centro_y),
+            8
+        )
+
+        pygame.draw.circle(
+            self.tela,
+            (30, 30, 30),
+            (centro_x, centro_y),
+            8,
+            2
+        )
+
+    def desenhar_painel(self):
+        painel = pygame.Rect(
+            850,
+            0,
+            350,
+            ALTURA_JANELA
+        )
+
+        pygame.draw.rect(
+            self.tela,
+            COR_PAINEL,
+            painel
+        )
+
+        self.desenhar_texto("EDITOR DE MAPAS", 875, 25)
+
+        self.desenhar_texto(
+            f"Mapa: {self.dados['nome']}",
+            875,
+            65
+        )
+
+        self.desenhar_texto(
+            f"Dimensões: {self.largura} x {self.altura}",
+            875,
+            95,
+            self.fonte_pequena
+        )
+
+        self.desenhar_texto("CAMADA ATUAL", 875, 145)
+
+        self.desenhar_texto(
+            f"< {self.camada_atual} >",
+            875,
+            175
+        )
+
+        self.desenhar_texto("TILES", 875, 225)
+
+        y = 260
+
+        for identificador, informacoes in self.tiles.items():
+            cor = tuple(informacoes["cor"])
+
+            rect = pygame.Rect(875, y, 28, 28)
+
+            pygame.draw.rect(self.tela, cor, rect)
+
+            if identificador == self.tile_selecionado:
+                pygame.draw.rect(
+                    self.tela,
+                    COR_SELECAO,
+                    rect,
+                    3
+                )
+
+            self.desenhar_texto(
+                identificador,
+                915,
+                y + 5,
+                self.fonte_pequena
+            )
+
+            y += 42
+
+        self.desenhar_texto("FERRAMENTAS", 875, 455)
+
+        self.desenhar_texto(
+            f"Modo: {self.modo}",
+            875,
+            490
+        )
+
+        self.desenhar_texto(
+            "[P] Pintar tiles",
+            875,
+            530,
+            self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            "[S] Posicionar spawn",
+            875,
+            555,
+            self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            "[ENTER] Salvar mapa",
+            875,
+            590,
+            self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            "[A/D] Trocar camada",
+            875,
+            615,
+            self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            "[ESC] Sair",
+            875,
+            640,
+            self.fonte_pequena
+        )
+
+        self.desenhar_texto(
+            self.salvar_mensagem,
+            875,
+            690,
+            self.fonte_pequena
+        )
+
+    def tratar_clique(self, posicao):
+        mouse_x, mouse_y = posicao
+
+        # Seleção de tiles no painel.
+        if mouse_x >= 850:
+            y = 260
+
+            for identificador in self.tiles:
+                rect = pygame.Rect(875, y, 200, 28)
+
+                if rect.collidepoint(posicao):
+                    self.tile_selecionado = identificador
+                    self.modo = "pintura"
+                    return
+
+                y += 42
+
+            return
+
+        posicao_tile = self.obter_posicao_tile(posicao)
+
+        if posicao_tile is None:
+            return
+
+        x, y = posicao_tile
+
+        if self.modo == "pintura":
+            self.pintar_tile(x, y)
+
+        elif self.modo == "spawn":
+            self.posicionar_spawn(x, y)
+
+    def tratar_eventos(self):
+        for evento in pygame.event.get():
+
+            if evento.type == pygame.QUIT:
+                self.executando = False
+
+            elif evento.type == pygame.KEYDOWN:
+
+                if evento.key == pygame.K_ESCAPE:
+                    self.executando = False
+
+                elif evento.key == pygame.K_RETURN:
+                    self.salvar_mapa()
+
+                elif evento.key == pygame.K_a:
+                    self.indice_camada = (
+                        self.indice_camada - 1
+                    ) % len(self.camadas)
+
+                elif evento.key == pygame.K_d:
+                    self.indice_camada = (
+                        self.indice_camada + 1
+                    ) % len(self.camadas)
+
+                elif evento.key == pygame.K_p:
+                    self.modo = "pintura"
+
+                elif evento.key == pygame.K_s:
+                    self.modo = "spawn"
+
+            elif evento.type == pygame.MOUSEBUTTONDOWN:
+
+                if evento.button == 1:
+                    self.tratar_clique(evento.pos)
+
+                elif evento.button == 3:
+                    posicao = self.obter_posicao_tile(evento.pos)
+
+                    if posicao is not None:
+                        x, y = posicao
+                        self.dados["camadas"][self.camada_atual][y][x] = None
+
+            elif evento.type == pygame.MOUSEMOTION:
+
+                if pygame.mouse.get_pressed()[0]:
+                    posicao = self.obter_posicao_tile(evento.pos)
+
+                    if posicao is not None and self.modo == "pintura":
+                        x, y = posicao
+                        self.pintar_tile(x, y)
+
+    def executar(self):
+        while self.executando:
+            self.relogio.tick(60)
+
+            self.tratar_eventos()
+
+            self.tela.fill(COR_FUNDO)
+
+            self.desenhar_mapa()
+            self.desenhar_painel()
+
+            pygame.display.flip()
+
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    editor = EditorMapa()
+    editor.executar()

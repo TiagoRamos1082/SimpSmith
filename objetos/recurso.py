@@ -25,6 +25,18 @@ class Recurso:
         self.solido = bool(item.get("solido", True))
         self.rect = pygame.Rect(x, y, tamanho, tamanho)
 
-    def desenhar(self, tela):
-        pygame.draw.rect(tela, self.cor, self.rect)
-        pygame.draw.rect(tela, (30, 30, 30), self.rect, 2)
+    def desenhar(self, tela, camera=None):
+        if camera is None:
+            rect_tela = self.rect
+        else:
+            posicao = camera.aplicar(self.rect.topleft)
+
+            rect_tela = pygame.Rect(
+                posicao[0],
+                posicao[1],
+                self.rect.width,
+                self.rect.height
+            )
+
+        pygame.draw.rect(tela, self.cor, rect_tela)
+        pygame.draw.rect(tela, (30, 30, 30), rect_tela, 2)

@@ -1,0 +1,591 @@
+﻿import json
+import os
+from pathlib import Path
+import pygame
+
+pygame.init()
+
+# ==========================================================
+# CAMINHOS
+# ==========================================================
+
+RAIZ = Path(__file__).resolve().parents[2]
+
+CAMINHO_MAPA = RAIZ / "dados" / "mapas" / "mapa_teste.json"
+CAMINHO_COLISOES = RAIZ / "mapa" / "colisoes.json"
+
+PASTA_TERRENO = RAIZ / "assets" / "tiles" / "terreno"
+PASTA_SUPERIOR = RAIZ / "assets" / "tiles" / "superior"
+
+if not CAMINHO_MAPA.is_file():
+    raise FileNotFoundError(CAMINHO_MAPA)
+
+with open(CAMINHO_MAPA, "r", encoding="utf-8") as arquivo:
+    dados_mapa = json.load(arquivo)
+
+CAMADAS = dados_mapa["camadas"]
+LARGURA_MAPA = dados_mapa["largura"]
+ALTURA_MAPA = dados_mapa["altura"]
+TILE_SIZE = dados_mapa["tile_size"]
+
+IMG_LARGURA = LARGURA_MAPA * TILE_SIZE
+IMG_ALTURA = ALTURA_MAPA * TILE_SIZE
+
+# ==========================================================
+# PYGAME
+# ==========================================================
+
+tela = pygame.display.set_mode((1024, 576), pygame.RESIZABLE)
+pygame.display.set_caption("SimpSmith - Editor de Colisoes")
+
+relogio = pygame.time.Clock()
+fonte = pygame.font.SysFont("arial", 17)
+fonte_pequena = pygame.font.SysFont("arial", 13)
+
+COR_OBSTACULO = (255, 40, 40)
+COR_INTERACAO = (30, 150, 255)
+COR_TEXTO = (255, 255, 255)
+
+mostrar_bordas = True
+mostrar_grade = False
+modo = "obstaculos"
+
+zoom = 1.0
+zoom_minimo = 0.25
+zoom_maximo = 5.0
+
+pan_x = 0.0
+pan_y = 0.0
+
+arrastando_camera = False
+ultima_posicao_camera = None
+
+arrastando = False
+inicio = None
+fim = None
+
+obstaculos = []
+areas_interacao = []
+
+# ==========================================================
+# CARREGAMENTO DOS SPRITES
+# ==========================================================
+
+def carregar_sprites(pasta):
+    sprites = {}
+
+    if not pasta.exists():
+        print(f"Pasta nao encontrada: {pasta}")
+        return sprites
+
+    for caminho in pasta.rglob("*.png"):
+        identificador = caminho.relative_to(pasta).with_suffix("").as_posix()
+
+        try:
+            imagem = pygame.image.load(str(caminho)).convert_alpha()
+            sprites[identificador] = imagem
+        except pygame.error as erro:
+            print(f"Erro ao carregar {caminho}: {erro}")
+
+    return sprites
+
+
+sprites_terreno = carregar_sprites(PASTA_TERRENO)
+sprites_superiores = carregar_sprites(PASTA_SUPERIOR)
+
+print(f"Sprites de terreno carregados: {len(sprites_terreno)}")
+print(f"Sprites superiores carregados: {len(sprites_superiores)}")
+
+# Permite encontrar terrenos também em subpastas.
+# Exemplo: grama.png ou terrenos/grama.png.
+sprites_terreno_por_nome = {}
+
+for identificador, imagem in sprites_terreno.items():
+    nome = identificador.split("/")[-1]
+    sprites_terreno_por_nome.setdefault(nome, imagem)
+
+# ==========================================================
+# CARREGAR COLISOES
+# ==========================================================
+
+if CAMINHO_COLISOES.is_file():
+    with open(CAMINHO_COLISOES, "r", encoding="utf-8") as arquivo:
+        dados = json.load(arquivo)
+
+    obstaculos = [
+        pygame.Rect(
+            item["x"],
+            item["y"],
+            item["largura"],
+            item["altura"]
+        )
+        for item in dados.get("obstaculos", [])
+    ]
+
+    areas_interacao = dados.get("areas_interacao", [])
+
+else:
+    areas_interacao = dados_mapa.get("areas_interacao", [])
+
+
+# ==========================================================
+# RENDERIZACAO DO MAPA
+# ==========================================================
+
+def criar_superficie_mapa():
+    superficie = pygame.Surface(
+        (IMG_LARGURA, IMG_ALTURA),
+        pygame.SRCALPHA
+    )
+
+    superficie.fill((45, 45, 45))
+
+    # Desenha os tiles do terreno e dos objetos.
+    # Nao existe mais colisao automatica por tipo de tile.
+
+    for nome_camada in ("terreno", "objetos"):
+        matriz = CAMADAS.get(nome_camada, [])
+
+        for y, linha in enumerate(matriz):
+            for x, nome_tile in enumerate(linha):
+
+                if nome_tile is None:
+                    continue
+
+                sprite = sprites_terreno_por_nome.get(str(nome_tile))
+
+                if sprite is None:
+                    continue
+
+                sprite_redimensionado = pygame.transform.scale(
+                    sprite,
+                    (TILE_SIZE, TILE_SIZE)
+                )
+
+                superficie.blit(
+                    sprite_redimensionado,
+                    (x * TILE_SIZE, y * TILE_SIZE)
+                )
+
+    return superficie
+
+
+imagem_original = criar_superficie_mapa()
+
+# ==========================================================
+# SPRITES SUPERIORES
+# ==========================================================
+
+def desenhar_sprites_superiores(area, escala):
+    for sprite in dados_mapa.get("sprites_superiores", []):
+
+        identificador = sprite.get("id")
+
+        imagem = sprites_superiores.get(identificador)
+
+        if imagem is None:
+            continue
+
+        largura = max(1, round(imagem.get_width() * escala))
+        altura = max(1, round(imagem.get_height() * escala))
+
+        imagem_redimensionada = pygame.transform.scale(
+            imagem,
+            (largura, altura)
+        )
+
+        x = area.x + round(sprite["x"] * escala)
+        y = area.y + round(sprite["y"] * escala)
+
+        tela.blit(imagem_redimensionada, (x, y))
+
+
+# ==========================================================
+# SALVAR
+# ==========================================================
+
+def salvar():
+    CAMINHO_COLISOES.parent.mkdir(parents=True, exist_ok=True)
+
+    dados = {
+        "largura_imagem": IMG_LARGURA,
+        "altura_imagem": IMG_ALTURA,
+        "tile_size": TILE_SIZE,
+        "mapa": dados_mapa.get("nome", "mapa"),
+        "obstaculos": [
+            {
+                "x": r.x,
+                "y": r.y,
+                "largura": r.width,
+                "altura": r.height
+            }
+            for r in obstaculos
+        ],
+        "areas_interacao": areas_interacao
+    }
+
+    with open(CAMINHO_COLISOES, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, indent=4, ensure_ascii=False)
+
+    print("Colisoes salvas com sucesso!")
+
+
+# ==========================================================
+# CAMERA E COORDENADAS
+# ==========================================================
+
+def area_imagem():
+    largura, altura = tela.get_size()
+
+    escala_base = min(
+        largura / IMG_LARGURA,
+        altura / IMG_ALTURA
+    )
+
+    escala = escala_base * zoom
+
+    w = max(1, round(IMG_LARGURA * escala))
+    h = max(1, round(IMG_ALTURA * escala))
+
+    x = (largura - w) // 2 + round(pan_x)
+    y = (altura - h) // 2 + round(pan_y)
+
+    return pygame.Rect(x, y, w, h), escala
+
+
+def mouse_para_imagem(pos):
+    area, escala = area_imagem()
+
+    if not area.collidepoint(pos):
+        return None
+
+    x = int((pos[0] - area.x) / escala)
+    y = int((pos[1] - area.y) / escala)
+
+    x = max(0, min(IMG_LARGURA - 1, x))
+    y = max(0, min(IMG_ALTURA - 1, y))
+
+    return x, y
+
+
+def retangulo_arrastado(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+
+    return pygame.Rect(
+        min(x1, x2),
+        min(y1, y2),
+        abs(x2 - x1),
+        abs(y2 - y1)
+    )
+
+
+# ==========================================================
+# EXCLUSAO
+# ==========================================================
+
+def apagar_proximo(pos):
+    ponto = mouse_para_imagem(pos)
+
+    if ponto is None:
+        return
+
+    px, py = ponto
+
+    if modo == "obstaculos":
+
+        for i in range(len(obstaculos) - 1, -1, -1):
+            if obstaculos[i].collidepoint(px, py):
+                del obstaculos[i]
+                salvar()
+                return
+
+    else:
+
+        for i in range(len(areas_interacao) - 1, -1, -1):
+            item = areas_interacao[i]
+
+            rect = pygame.Rect(
+                item["x"],
+                item["y"],
+                item["largura"],
+                item["altura"]
+            )
+
+            if rect.collidepoint(px, py):
+                del areas_interacao[i]
+                salvar()
+                return
+
+
+# ==========================================================
+# LOOP PRINCIPAL
+# ==========================================================
+
+executando = True
+
+while executando:
+    relogio.tick(60)
+
+    for evento in pygame.event.get():
+
+        if evento.type == pygame.QUIT:
+            executando = False
+
+        elif evento.type == pygame.KEYDOWN:
+
+            if evento.key == pygame.K_ESCAPE:
+                executando = False
+
+            elif evento.key == pygame.K_1:
+                modo = "obstaculos"
+
+            elif evento.key == pygame.K_2:
+                modo = "interacao"
+
+            elif evento.key == pygame.K_b:
+                mostrar_bordas = not mostrar_bordas
+
+            elif evento.key == pygame.K_g:
+                mostrar_grade = not mostrar_grade
+
+            elif evento.key == pygame.K_s and (
+                pygame.key.get_mods() & pygame.KMOD_CTRL
+            ):
+                salvar()
+
+        elif evento.type == pygame.MOUSEWHEEL:
+
+            mouse = pygame.mouse.get_pos()
+            area, escala_atual = area_imagem()
+
+            if area.collidepoint(mouse):
+
+                escala_base = min(
+                    tela.get_width() / IMG_LARGURA,
+                    tela.get_height() / IMG_ALTURA
+                )
+
+                novo_zoom = max(
+                    zoom_minimo,
+                    min(zoom_maximo, zoom * (1.15 ** evento.y))
+                )
+
+                if novo_zoom != zoom:
+
+                    mundo_x = (mouse[0] - area.x) / escala_atual
+                    mundo_y = (mouse[1] - area.y) / escala_atual
+
+                    zoom = novo_zoom
+                    nova_escala = escala_base * zoom
+
+                    pan_x = (
+                        mouse[0] - mundo_x * nova_escala
+                        - (tela.get_width() - IMG_LARGURA * nova_escala) / 2
+                    )
+
+                    pan_y = (
+                        mouse[1] - mundo_y * nova_escala
+                        - (tela.get_height() - IMG_ALTURA * nova_escala) / 2
+                    )
+
+        elif evento.type == pygame.MOUSEBUTTONDOWN:
+
+            if evento.button == 2:
+                arrastando_camera = True
+                ultima_posicao_camera = evento.pos
+
+            elif evento.button == 1:
+
+                ponto = mouse_para_imagem(evento.pos)
+
+                if ponto is not None:
+                    inicio = ponto
+                    fim = ponto
+                    arrastando = True
+
+            elif evento.button == 3:
+                apagar_proximo(evento.pos)
+
+        elif evento.type == pygame.MOUSEMOTION:
+
+            if arrastando_camera:
+
+                dx = evento.pos[0] - ultima_posicao_camera[0]
+                dy = evento.pos[1] - ultima_posicao_camera[1]
+
+                pan_x += dx
+                pan_y += dy
+
+                ultima_posicao_camera = evento.pos
+
+            elif arrastando:
+
+                ponto = mouse_para_imagem(evento.pos)
+
+                if ponto is not None:
+                    fim = ponto
+
+        elif evento.type == pygame.MOUSEBUTTONUP:
+
+            if evento.button == 2:
+                arrastando_camera = False
+                ultima_posicao_camera = None
+
+            elif evento.button == 1 and arrastando:
+
+                ponto = mouse_para_imagem(evento.pos)
+
+                if ponto is not None:
+                    fim = ponto
+
+                if inicio is not None and fim is not None:
+
+                    novo = retangulo_arrastado(inicio, fim)
+
+                    if novo.width >= 3 and novo.height >= 3:
+
+                        if modo == "obstaculos":
+                            obstaculos.append(novo)
+
+                        else:
+                            numero = len(areas_interacao) + 1
+
+                            areas_interacao.append({
+                                "id": f"area_{numero}",
+                                "x": novo.x,
+                                "y": novo.y,
+                                "largura": novo.width,
+                                "altura": novo.height,
+                                "tipo": "fornalha"
+                            })
+
+                        salvar()
+
+                arrastando = False
+                inicio = None
+                fim = None
+
+    # ======================================================
+    # DESENHO
+    # ======================================================
+
+    tela.fill((35, 35, 35))
+
+    area, escala = area_imagem()
+
+    imagem = pygame.transform.scale(
+        imagem_original,
+        (area.width, area.height)
+    )
+
+    tela.blit(imagem, area.topleft)
+
+    # Sprites superiores ficam sobre o terreno.
+    desenhar_sprites_superiores(area, escala)
+
+    # Grade
+    if mostrar_grade:
+
+        for x in range(LARGURA_MAPA + 1):
+            px = area.x + round(x * TILE_SIZE * escala)
+
+            pygame.draw.line(
+                tela,
+                (0, 0, 0),
+                (px, area.y),
+                (px, area.bottom),
+                1
+            )
+
+        for y in range(ALTURA_MAPA + 1):
+            py = area.y + round(y * TILE_SIZE * escala)
+
+            pygame.draw.line(
+                tela,
+                (0, 0, 0),
+                (area.x, py),
+                (area.right, py),
+                1
+            )
+
+    # Colisoes e areas de interacao
+    if mostrar_bordas:
+
+        for obstaculo in obstaculos:
+
+            visual = pygame.Rect(
+                area.x + round(obstaculo.x * escala),
+                area.y + round(obstaculo.y * escala),
+                max(1, round(obstaculo.width * escala)),
+                max(1, round(obstaculo.height * escala))
+            )
+
+            pygame.draw.rect(tela, COR_OBSTACULO, visual, 2)
+
+        for item in areas_interacao:
+
+            visual = pygame.Rect(
+                area.x + round(item["x"] * escala),
+                area.y + round(item["y"] * escala),
+                max(1, round(item["largura"] * escala)),
+                max(1, round(item["altura"] * escala))
+            )
+
+            pygame.draw.rect(tela, COR_INTERACAO, visual, 2)
+
+            numero = fonte_pequena.render(
+                item["id"], True, COR_TEXTO
+            )
+
+            tela.blit(numero, (visual.x + 2, visual.y + 2))
+
+    # Retangulo sendo criado
+    if arrastando and inicio is not None and fim is not None:
+
+        r = retangulo_arrastado(inicio, fim)
+
+        visual = pygame.Rect(
+            area.x + round(r.x * escala),
+            area.y + round(r.y * escala),
+            max(1, round(r.width * escala)),
+            max(1, round(r.height * escala))
+        )
+
+        cor = (
+            COR_OBSTACULO
+            if modo == "obstaculos"
+            else COR_INTERACAO
+        )
+
+        pygame.draw.rect(tela, cor, visual, 2)
+
+    # ======================================================
+    # INSTRUCOES
+    # ======================================================
+
+    pygame.draw.rect(
+        tela,
+        (25, 25, 25),
+        (0, 0, tela.get_width(), 32)
+    )
+
+    nome_modo = (
+        "OBSTACULOS"
+        if modo == "obstaculos"
+        else "AREAS DE INTERACAO"
+    )
+
+    instrucoes = (
+        f"1: Obstaculos | 2: Areas | "
+        f"Modo: {nome_modo} | "
+        f"Esquerdo: criar | Direito: apagar | "
+        f"B: bordas | G: grade | Ctrl+S: salvar | ESC: sair"
+    )
+
+    texto = fonte.render(instrucoes, True, COR_TEXTO)
+    tela.blit(texto, (8, 7))
+
+    pygame.display.flip()
+
+pygame.quit()

@@ -1,7 +1,8 @@
-
+﻿
 import json
 import os
 import sys
+import ctypes
 import pygame
 
 pygame.init()
@@ -12,11 +13,14 @@ if RAIZ not in sys.path:
 
 from sistemas.catalogo_itens import CatalogoItens
 
-CAMINHO_IMAGEM = os.path.join(RAIZ, "assets", "mapas", "mapaPrincipal.png")
+CAMINHO_MAPA = os.path.join(RAIZ, "dados", "mapas", "mapa_principal.json")
+CAMINHO_SPRITES = os.path.join(RAIZ, "assets", "tiles", "superior")
 CAMINHO_AREAS = os.path.join(RAIZ, "mapa", "areas_minerios.json")
 
-if not os.path.isfile(CAMINHO_IMAGEM):
-    raise FileNotFoundError(f"Imagem não encontrada: {CAMINHO_IMAGEM}")
+if not os.path.isfile(CAMINHO_MAPA):
+    raise FileNotFoundError(f"Mapa nao encontrado: {CAMINHO_MAPA}")
+
+    raise FileNotFoundError(f"Imagem nÃ£o encontrada: {CAMINHO_IMAGEM}")
 
 catalogo = CatalogoItens()
 
@@ -59,16 +63,85 @@ tela = pygame.display.set_mode(
     (LARGURA_JANELA, ALTURA_JANELA), pygame.RESIZABLE
 )
 
-imagem_original = pygame.image.load(CAMINHO_IMAGEM).convert()
-IMG_LARGURA, IMG_ALTURA = imagem_original.get_size()
+try:
+    pygame.display.flip()
+    hwnd = pygame.display.get_wm_info().get("window")
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, 3)
+except (AttributeError, OSError):
+    pass
+
+with open(CAMINHO_MAPA, "r", encoding="utf-8-sig") as arquivo_mapa:
+    dados_mapa = json.load(arquivo_mapa)
+
+TAMANHO_TILE = dados_mapa["tile_size"]
+IMG_LARGURA = dados_mapa["largura"] * TAMANHO_TILE
+IMG_ALTURA = dados_mapa["altura"] * TAMANHO_TILE
+
+imagem_original = pygame.Surface((IMG_LARGURA, IMG_ALTURA))
+imagem_original.fill((35, 35, 40))
+
+# Desenha as camadas do mapa.
+for nome_camada, grade in dados_mapa["camadas"].items():
+    for y, linha in enumerate(grade):
+        for x, identificador in enumerate(linha):
+            if identificador is None:
+                continue
+
+            informacoes = dados_mapa["tiles"][identificador]
+            pygame.draw.rect(
+                imagem_original,
+                tuple(informacoes["cor"]),
+                (
+                    x * TAMANHO_TILE,
+                    y * TAMANHO_TILE,
+                    TAMANHO_TILE,
+                    TAMANHO_TILE,
+                ),
+            )
+
+# Carrega os sprites superiores.
+sprites = {}
+
+if os.path.isdir(CAMINHO_SPRITES):
+    for raiz, _, arquivos in os.walk(CAMINHO_SPRITES):
+        for nome_arquivo in arquivos:
+            if not nome_arquivo.lower().endswith(".png"):
+                continue
+
+            caminho = os.path.join(raiz, nome_arquivo)
+            identificador = os.path.relpath(
+                caminho, CAMINHO_SPRITES
+            )[:-4].replace(os.sep, "/")
+
+            sprites[identificador] = pygame.image.load(
+                caminho
+            ).convert_alpha()
+
+# Desenha os sprites nas coordenadas do mapa.
+for sprite in dados_mapa.get("sprites_superiores", []):
+    imagem_sprite = sprites.get(sprite["id"])
+
+    if imagem_sprite is not None:
+        imagem_original.blit(
+            imagem_sprite,
+            (sprite["x"], sprite["y"]),
+        )
 
 relogio = pygame.time.Clock()
 fonte = pygame.font.SysFont("arial", 16)
 fonte_pequena = pygame.font.SysFont("arial", 13)
 
-COR_TEXTO = (255, 255, 255)
-COR_FUNDO = (25, 25, 25)
-COR_SELECAO = (0, 255, 255)
+COR_TEXTO = (241, 241, 241)
+COR_FUNDO = (23, 25, 31)
+COR_PAINEL = (34, 37, 45)
+COR_PAINEL_CLARO = (43, 47, 57)
+COR_DESTAQUE = (217, 155, 69)
+COR_SECUNDARIA = (160, 165, 176)
+COR_SELECAO = (245, 245, 245)
+
+ALTURA_CABECALHO = 112
+ALTURA_RODAPE = 112
 
 tipos_disponiveis = list(RECURSOS.keys())
 tipo_atual = tipos_disponiveis[0]
@@ -83,6 +156,45 @@ mensagem = ""
 tempo_mensagem = 0
 
 
+
+# C?mera do mapa
+ZOOM_MINIMO = 0.25
+ZOOM_MAXIMO = 4.0
+FATOR_ZOOM = 1.15
+
+escala_base = min(
+    LARGURA_JANELA / IMG_LARGURA,
+    ALTURA_JANELA / IMG_ALTURA,
+)
+zoom = 1.0
+escala = escala_base
+
+camera_x = (LARGURA_JANELA - IMG_LARGURA * escala) / 2
+camera_y = (ALTURA_JANELA - IMG_ALTURA * escala) / 2
+
+def ajustar_camera_janela():
+    global escala_base, escala, camera_x, camera_y
+
+    largura, altura = tela.get_size()
+    area_altura = max(
+        100, altura - ALTURA_CABECALHO - ALTURA_RODAPE
+    )
+
+    escala_base = min(
+        largura / IMG_LARGURA,
+        area_altura / IMG_ALTURA
+    )
+    escala = escala_base * zoom
+
+    camera_x = (largura - IMG_LARGURA * escala) / 2
+    camera_y = (
+        ALTURA_CABECALHO
+        + (area_altura - IMG_ALTURA * escala) / 2
+    )
+
+movendo_camera = False
+ultima_posicao_mouse = None
+
 def carregar_areas():
     if not os.path.isfile(CAMINHO_AREAS):
         return
@@ -96,20 +208,29 @@ def carregar_areas():
         ):
             raise ValueError("O arquivo precisa conter uma lista 'areas'.")
 
+        largura_antiga = int(dados.get("largura_imagem", IMG_LARGURA))
+        altura_antiga = int(dados.get("altura_imagem", IMG_ALTURA))
+
+        if largura_antiga <= 0 or altura_antiga <= 0:
+            raise ValueError("Dimensoes antigas invalidas.")
+
+        fator_x = IMG_LARGURA / largura_antiga
+        fator_y = IMG_ALTURA / altura_antiga
+
         for item in dados.get("areas", []):
             tipo = item["tipo"]
 
             if tipo not in RECURSOS:
                 raise ValueError(
-                    f"O tipo '{tipo}' das áreas não existe no catálogo "
+                    f"O tipo '{tipo}' das Ã¡reas nÃ£o existe no catÃ¡logo "
                     "como recurso (minerio ou planta). "
-                    "Cadastre-o em dados/itens.json ou corrija a área."
+                    "Cadastre-o em dados/itens.json ou corrija a Ã¡rea."
                 )
 
-            x = int(item["x"])
-            y = int(item["y"])
-            largura = int(item["largura"])
-            altura = int(item["altura"])
+            x = round(int(item["x"]) * fator_x)
+            y = round(int(item["y"]) * fator_y)
+            largura = round(int(item["largura"]) * fator_x)
+            altura = round(int(item["altura"]) * fator_y)
             config = RECURSOS[tipo]
 
             maximo = int(item.get("maximo", config["maximo"]))
@@ -117,10 +238,10 @@ def carregar_areas():
             respawn = float(item.get("respawn", config["respawn"]))
 
             if largura <= 0 or altura <= 0:
-                raise ValueError("Área com dimensões inválidas.")
+                raise ValueError("Ãrea com dimensÃµes invÃ¡lidas.")
 
             if maximo < 1 or not 0 <= inicial <= maximo:
-                raise ValueError("Limite ou quantidade inicial inválida.")
+                raise ValueError("Limite ou quantidade inicial invÃ¡lida.")
 
             if respawn <= 0:
                 raise ValueError("O tempo de respawn precisa ser positivo.")
@@ -138,7 +259,7 @@ def carregar_areas():
 
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as erro:
         raise ValueError(
-            f"Não foi possível carregar {CAMINHO_AREAS}: {erro}"
+            f"NÃ£o foi possÃ­vel carregar {CAMINHO_AREAS}: {erro}"
         ) from erro
 
 
@@ -162,35 +283,28 @@ def salvar():
         arquivo.write("\n")
 
     os.replace(temporario, CAMINHO_AREAS)
-    avisar(f"{len(areas)} áreas salvas!")
+    avisar(f"{len(areas)} Ã¡reas salvas!")
 
 
-def area_imagem():
-    largura, altura = tela.get_size()
-    escala = min(largura / IMG_LARGURA, altura / IMG_ALTURA)
-
-    w = round(IMG_LARGURA * escala)
-    h = round(IMG_ALTURA * escala)
-
-    x = (largura - w) // 2
-    y = (altura - h) // 2
-
-    return pygame.Rect(x, y, w, h), escala
+def atualizar_escala():
+    global escala
+    escala = escala_base * zoom
 
 
 def mouse_para_imagem(pos):
-    area, escala = area_imagem()
-
-    if escala <= 0 or not area.collidepoint(pos):
+    if (
+        pos[1] < ALTURA_CABECALHO
+        or pos[1] >= tela.get_height() - ALTURA_RODAPE
+    ):
         return None
 
-    x = round((pos[0] - area.x) / escala)
-    y = round((pos[1] - area.y) / escala)
+    x = (pos[0] - camera_x) / escala
+    y = (pos[1] - camera_y) / escala
 
-    x = max(0, min(IMG_LARGURA - 1, x))
-    y = max(0, min(IMG_ALTURA - 1, y))
+    if not (0 <= x < IMG_LARGURA and 0 <= y < IMG_ALTURA):
+        return None
 
-    return x, y
+    return round(x), round(y)
 
 
 def retangulo_arrastado(p1, p2):
@@ -205,10 +319,10 @@ def retangulo_arrastado(p1, p2):
     )
 
 
-def area_para_tela(retangulo, area, escala):
+def area_para_tela(retangulo):
     return pygame.Rect(
-        area.x + round(retangulo.x * escala),
-        area.y + round(retangulo.y * escala),
+        round(camera_x + retangulo.x * escala),
+        round(camera_y + retangulo.y * escala),
         max(1, round(retangulo.width * escala)),
         max(1, round(retangulo.height * escala)),
     )
@@ -240,7 +354,7 @@ def selecionar_area(pos):
 
 def criar_area(rect):
     if rect.width < 3 or rect.height < 3:
-        avisar("Área muito pequena.")
+        avisar("Ãrea muito pequena.")
         return
 
     config = RECURSOS[tipo_atual]
@@ -281,7 +395,7 @@ def remover_area(indice):
 
 def alterar_configuracao(campo, valor):
     if area_selecionada is None:
-        avisar("Selecione uma área primeiro.")
+        avisar("Selecione uma Ã¡rea primeiro.")
         return
 
     item = areas[area_selecionada]
@@ -307,6 +421,27 @@ def desenhar_texto(texto, x, y, cor=COR_TEXTO, pequena=False):
     tela.blit(superficie, (x, y))
 
 
+def obter_botoes_propriedades(largura, y):
+    botoes = {}
+    largura_coluna = largura // 3
+
+    for indice, campo in enumerate(
+        ("maximo", "inicial", "respawn")
+    ):
+        x = indice * largura_coluna
+
+        botoes[campo] = {
+            "menos": pygame.Rect(
+                x + largura_coluna - 105, y + 57, 34, 30
+            ),
+            "mais": pygame.Rect(
+                x + largura_coluna - 55, y + 57, 34, 30
+            ),
+        }
+
+    return botoes
+
+
 def selecionar_tipo_por_indice(indice):
     global tipo_atual
 
@@ -324,6 +459,52 @@ while executando:
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             executando = False
+
+        elif evento.type == pygame.VIDEORESIZE:
+            ajustar_camera_janela()
+
+        elif evento.type == pygame.MOUSEWHEEL:
+            pos = pygame.mouse.get_pos()
+
+
+            zoom_anterior = zoom
+
+
+        
+
+
+            if evento.y > 0:
+
+
+                zoom = min(ZOOM_MAXIMO, zoom * FATOR_ZOOM)
+
+
+            elif evento.y < 0:
+
+
+                zoom = max(ZOOM_MINIMO, zoom / FATOR_ZOOM)
+
+
+        
+
+
+            if zoom != zoom_anterior:
+
+
+                fator = zoom / zoom_anterior
+
+
+                camera_x = pos[0] - (pos[0] - camera_x) * fator
+
+
+                camera_y = pos[1] - (pos[1] - camera_y) * fator
+
+
+                atualizar_escala()
+
+
+        
+
 
         elif evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_ESCAPE:
@@ -369,6 +550,38 @@ while executando:
 
         elif evento.type == pygame.MOUSEBUTTONDOWN:
             if evento.button == 1:
+                botao_voltar = pygame.Rect(
+                    tela.get_width() - 190, 12, 170, 42
+                )
+                if botao_voltar.collidepoint(evento.pos):
+                    executando = False
+                    continue
+
+            if evento.button == 2:
+                movendo_camera = True
+                ultima_posicao_mouse = evento.pos
+            
+            elif evento.button == 1:
+                y_painel = tela.get_height() - ALTURA_RODAPE
+                botoes = obter_botoes_propriedades(
+                    tela.get_width(), y_painel
+                )
+
+                if (
+                    area_selecionada is not None
+                    and y_painel <= evento.pos[1]
+                ):
+                    for campo, controles in botoes.items():
+                        if controles["menos"].collidepoint(evento.pos):
+                            alterar_configuracao(campo, -1)
+                            break
+
+                        if controles["mais"].collidepoint(evento.pos):
+                            alterar_configuracao(campo, 1)
+                            break
+
+                    continue
+
                 indice = selecionar_area(evento.pos)
 
                 if indice is not None:
@@ -389,14 +602,27 @@ while executando:
                 if indice is not None:
                     remover_area(indice)
 
-        elif evento.type == pygame.MOUSEMOTION and arrastando:
-            ponto = mouse_para_imagem(evento.pos)
+        elif evento.type == pygame.MOUSEMOTION:
+                if movendo_camera:
+                    dx = evento.pos[0] - ultima_posicao_mouse[0]
+                    dy = evento.pos[1] - ultima_posicao_mouse[1]
+                    camera_x += dx
+                    camera_y += dy
+                    ultima_posicao_mouse = evento.pos
 
-            if ponto is not None:
-                fim = ponto
+                elif arrastando:
+                    ponto = mouse_para_imagem(evento.pos)
+                    if ponto is not None:
+                        fim = ponto
+
+            
 
         elif evento.type == pygame.MOUSEBUTTONUP:
-            if evento.button == 1 and arrastando:
+            if evento.button == 2:
+                movendo_camera = False
+                ultima_posicao_mouse = None
+            
+            elif evento.button == 1 and arrastando:
                 ponto = mouse_para_imagem(evento.pos)
 
                 if ponto is not None:
@@ -409,19 +635,24 @@ while executando:
                 inicio = None
                 fim = None
 
-    tela.fill((35, 35, 35))
+    tela.fill(COR_FUNDO)
 
-    area, escala = area_imagem()
+    largura_tela, altura_tela = tela.get_size()
+
+    largura = max(1, round(IMG_LARGURA * escala))
+    altura = max(1, round(IMG_ALTURA * escala))
+
     imagem = pygame.transform.scale(
         imagem_original,
-        (area.width, area.height),
+        (largura, altura),
     )
 
-    tela.blit(imagem, area.topleft)
+    tela.blit(imagem, (round(camera_x), round(camera_y)))
 
+    # Áreas de recursos
     for indice, item in enumerate(areas):
         rect = obter_rect(item)
-        visual = area_para_tela(rect, area, escala)
+        visual = area_para_tela(rect)
         cor = RECURSOS[item["tipo"]]["cor"]
 
         if mostrar_bordas:
@@ -432,14 +663,16 @@ while executando:
                 visual.x + 3,
                 visual.y + 3,
                 cor,
+                pequena=True,
             )
 
         if indice == area_selecionada:
             pygame.draw.rect(tela, COR_SELECAO, visual, 3)
 
+    # Área sendo desenhada
     if arrastando and inicio is not None and fim is not None:
         rect = retangulo_arrastado(inicio, fim)
-        visual = area_para_tela(rect, area, escala)
+        visual = area_para_tela(rect)
 
         pygame.draw.rect(
             tela,
@@ -448,66 +681,217 @@ while executando:
             2,
         )
 
+    # Cabeçalho
     pygame.draw.rect(
-        tela,
-        COR_FUNDO,
-        (0, 0, tela.get_width(), 112),
+        tela, COR_PAINEL,
+        (0, 0, largura_tela, ALTURA_CABECALHO)
+    )
+    pygame.draw.line(
+        tela, COR_PAINEL_CLARO,
+        (0, ALTURA_CABECALHO - 1),
+        (largura_tela, ALTURA_CABECALHO - 1),
+        1,
     )
 
     desenhar_texto(
-        "ESQUERDO: desenhar/selecionar | DIREITO: remover | "
-        "B: bordas | CTRL+S: salvar | ESC: sair",
-        8, 5, pequena=True,
+        "SIMP SMITH", 20, 12, COR_DESTAQUE
+    )
+    desenhar_texto(
+        "EDITOR DE RECURSOS", 20, 39,
+        COR_SECUNDARIA, pequena=True
+    )
+
+    desenhar_texto(
+        f"Recurso atual: {RECURSOS[tipo_atual]['nome']}",
+        230, 13, COR_TEXTO
+    )
+
+    desenhar_texto(
+        "Clique e arraste: criar área | Clique: selecionar | "
+        "Botão direito: remover | Scroll: zoom | Meio: mover",
+        230, 43, COR_SECUNDARIA, pequena=True
     )
 
     legendas = []
-
     for indice, tipo in enumerate(tipos_disponiveis[:9]):
-        legendas.append(f"{indice + 1}: {RECURSOS[tipo]['nome']}")
+        legendas.append(
+            f"{indice + 1}: {RECURSOS[tipo]['nome']}"
+        )
 
     desenhar_texto(
-        "Recursos: " + " | ".join(legendas) + " | TAB: próximo recurso",
-        8, 26, pequena=True,
+        "Recursos: " + "  |  ".join(legendas)
+        + "  |  TAB: próximo",
+        230, 68, COR_SECUNDARIA, pequena=True
     )
 
-    desenhar_texto(
-        "Setas cima/baixo: limite | Esquerda/direita: respawn | "
-        "PageUp/PageDown: inicial | Delete: remover",
-        8, 46, pequena=True,
+    # Botão voltar à Central
+    botao_voltar = pygame.Rect(
+        largura_tela - 190, 12, 170, 42
     )
 
+    pygame.draw.rect(
+        tela, COR_PAINEL_CLARO,
+        botao_voltar, border_radius=7
+    )
+    pygame.draw.rect(
+        tela, COR_DESTAQUE,
+        botao_voltar, width=1, border_radius=7
+    )
+
+    texto_voltar = fonte_pequena.render(
+        "< VOLTAR À CENTRAL", True, COR_TEXTO
+    )
+    tela.blit(
+        texto_voltar,
+        texto_voltar.get_rect(center=botao_voltar.center)
+    )
+
+    # Informações da área selecionada
     if area_selecionada is not None:
         item = areas[area_selecionada]
         nome = RECURSOS[item["tipo"]]["nome"]
 
+        info = (
+            f"Selecionada: {nome}  |  Máximo: {item['maximo']}  |  "
+            f"Inicial: {item['inicial']}  |  "
+            f"Respawn: {item['respawn']:.0f}s"
+        )
+    else:
+        info = (
+            f"Tipo atual: {RECURSOS[tipo_atual]['nome']}  |  "
+            f"Áreas cadastradas: {len(areas)}"
+        )
+
+    desenhar_texto(
+        info, 20, 90, COR_TEXTO, pequena=True
+    )
+
+    # Painel de propriedades
+    y_rodape = altura_tela - ALTURA_RODAPE
+
+    pygame.draw.rect(
+        tela,
+        COR_PAINEL,
+        (0, y_rodape, largura_tela, ALTURA_RODAPE)
+    )
+
+    pygame.draw.line(
+        tela,
+        COR_PAINEL_CLARO,
+        (0, y_rodape),
+        (largura_tela, y_rodape),
+        1
+    )
+
+    desenhar_texto(
+        "PROPRIEDADES DA ÁREA",
+        20, y_rodape + 10,
+        COR_DESTAQUE,
+        pequena=True
+    )
+
+    botoes = obter_botoes_propriedades(
+        largura_tela, y_rodape
+    )
+
+    if area_selecionada is not None:
+        item = areas[area_selecionada]
+
+        propriedades = [
+            ("maximo", "Quantidade máxima", str(item["maximo"])),
+            ("inicial", "Quantidade inicial", str(item["inicial"])),
+            ("respawn", "Tempo de respawn", f"{item['respawn']:.0f} s"),
+        ]
+
+        largura_coluna = largura_tela // 3
+
+        for indice, (campo, rotulo, valor) in enumerate(propriedades):
+            x = indice * largura_coluna
+
+            desenhar_texto(
+                rotulo,
+                x + 12,
+                y_rodape + 39,
+                COR_SECUNDARIA,
+                pequena=True
+            )
+
+            for acao in ("menos", "mais"):
+                botao = botoes[campo][acao]
+
+                pygame.draw.rect(
+                    tela,
+                    COR_PAINEL_CLARO,
+                    botao,
+                    border_radius=5
+                )
+
+                pygame.draw.rect(
+                    tela,
+                    COR_DESTAQUE,
+                    botao,
+                    width=1,
+                    border_radius=5
+                )
+
+                simbolo = "-" if acao == "menos" else "+"
+
+                superficie = fonte.render(
+                    simbolo, True, COR_TEXTO
+                )
+
+                tela.blit(
+                    superficie,
+                    superficie.get_rect(center=botao.center)
+                )
+
+            superficie_valor = fonte_pequena.render(
+                valor, True, COR_TEXTO
+            )
+
+            posicao_valor = (
+                botoes[campo]["menos"].left - 12,
+                botoes[campo]["menos"].centery
+            )
+
+            tela.blit(
+                superficie_valor,
+                superficie_valor.get_rect(
+                    midright=posicao_valor
+                )
+            )
+
         desenhar_texto(
-            f"Selecionada: {nome} | Máximo: {item['maximo']} | "
-            f"Inicial: {item['inicial']} | Respawn: {item['respawn']:.0f}s",
-            8, 68, pequena=True,
+            "Clique nos botões para alterar. As mudanças são salvas automaticamente.",
+            20,
+            y_rodape + 91,
+            COR_SECUNDARIA,
+            pequena=True
         )
 
     else:
         desenhar_texto(
-            f"Tipo atual: {RECURSOS[tipo_atual]['nome']} | "
-            f"Áreas: {len(areas)}",
-            8, 68, pequena=True,
+            "Selecione uma área no mapa para editar suas propriedades.",
+            20,
+            y_rodape + 54,
+            COR_SECUNDARIA,
+            pequena=True
         )
 
     if pygame.time.get_ticks() < tempo_mensagem:
-        largura_texto = fonte.size(mensagem)[0] + 20
-
-        pygame.draw.rect(
-            tela,
-            COR_FUNDO,
-            (8, tela.get_height() - 32, largura_texto, 26),
+        superficie_mensagem = fonte_pequena.render(
+            mensagem, True, COR_DESTAQUE
         )
-
-        desenhar_texto(
-            mensagem,
-            16,
-            tela.get_height() - 28,
+        tela.blit(
+            superficie_mensagem,
+            (
+                largura_tela - superficie_mensagem.get_width() - 20,
+                y_rodape + 10,
+            )
         )
 
     pygame.display.flip()
 
 pygame.quit()
+
+

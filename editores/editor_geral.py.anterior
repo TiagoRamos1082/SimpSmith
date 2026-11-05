@@ -1,0 +1,318 @@
+﻿import os
+import sys
+import subprocess
+import tkinter as tk
+from tkinter import ttk
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
+PASTA_EDITORES = Path(__file__).resolve().parent
+
+class CentralEditores:
+    def __init__(self, janela):
+        self.janela = janela
+        self.janela.title("SimpSmith | Central de Editores")
+        self.janela.geometry("1050x700")
+        self.janela.minsize(850, 600)
+
+        self.processos = {}
+        self.editores = []
+
+        self.configurar_estilo()
+        self.criar_interface()
+        self.atualizar_inventario()
+        self.monitorar_processos()
+
+    def configurar_estilo(self):
+        self.janela.configure(bg="#17191f")
+
+        estilo = ttk.Style()
+        estilo.theme_use("clam")
+
+        estilo.configure(
+            "TFrame",
+            background="#17191f"
+        )
+        estilo.configure(
+            "TLabel",
+            background="#17191f",
+            foreground="#eeeeee",
+            font=("Segoe UI", 10)
+        )
+        estilo.configure(
+            "Titulo.TLabel",
+            font=("Segoe UI", 22, "bold"),
+            foreground="#ffffff"
+        )
+        estilo.configure(
+            "Subtitulo.TLabel",
+            font=("Segoe UI", 10),
+            foreground="#9ca3af"
+        )
+        estilo.configure(
+            "TButton",
+            font=("Segoe UI", 10),
+            padding=9
+        )
+        estilo.configure(
+            "Treeview",
+            background="#22252d",
+            foreground="#eeeeee",
+            fieldbackground="#22252d",
+            rowheight=27
+        )
+        estilo.configure(
+            "Treeview.Heading",
+            background="#30343e",
+            foreground="#ffffff",
+            font=("Segoe UI", 10, "bold")
+        )
+
+    def criar_interface(self):
+        principal = ttk.Frame(self.janela, padding=25)
+        principal.pack(fill="both", expand=True)
+
+        cabecalho = ttk.Frame(principal)
+        cabecalho.pack(fill="x", pady=(0, 20))
+
+        ttk.Label(
+            cabecalho,
+            text="⚒ SimpSmith",
+            style="Titulo.TLabel"
+        ).pack(anchor="w")
+
+        ttk.Label(
+            cabecalho,
+            text="CENTRAL DE FERRAMENTAS E EDITORES",
+            style="Subtitulo.TLabel"
+        ).pack(anchor="w", pady=(4, 0))
+
+        corpo = ttk.Frame(principal)
+        corpo.pack(fill="both", expand=True)
+
+        # Painel esquerdo: editores
+        painel_editores = ttk.Frame(corpo)
+        painel_editores.pack(
+            side="left",
+            fill="both",
+            expand=True,
+            padx=(0, 15)
+        )
+
+        ttk.Label(
+            painel_editores,
+            text="Editores disponíveis",
+            font=("Segoe UI", 14, "bold")
+        ).pack(anchor="w", pady=(0, 12))
+
+        self.lista_editores = ttk.Frame(painel_editores)
+        self.lista_editores.pack(fill="both", expand=True)
+
+        # Painel direito: inventário
+        painel_inventario = ttk.Frame(corpo)
+        painel_inventario.pack(
+            side="right",
+            fill="both",
+            expand=True
+        )
+
+        ttk.Label(
+            painel_inventario,
+            text="Inventário do diretório",
+            font=("Segoe UI", 14, "bold")
+        ).pack(anchor="w", pady=(0, 12))
+
+        self.arvore = ttk.Treeview(
+            painel_inventario,
+            columns=("tipo",),
+            show="tree headings"
+        )
+        self.arvore.heading("#0", text="Arquivo / Diretório")
+        self.arvore.heading("tipo", text="Tipo")
+        self.arvore.column("#0", width=280)
+        self.arvore.column("tipo", width=90, anchor="center")
+        self.arvore.pack(fill="both", expand=True)
+
+        # Rodapé
+        rodape = ttk.Frame(principal)
+        rodape.pack(fill="x", pady=(18, 0))
+
+        self.status = ttk.Label(
+            rodape,
+            text="Central pronta."
+        )
+        self.status.pack(side="left")
+
+        ttk.Button(
+            rodape,
+            text="Atualizar inventário",
+            command=self.atualizar_inventario
+        ).pack(side="right", padx=5)
+
+        ttk.Button(
+            rodape,
+            text="Abrir pasta de editores",
+            command=self.abrir_pasta
+        ).pack(side="right", padx=5)
+
+    def descobrir_editores(self):
+        encontrados = []
+
+        for arquivo in PASTA_EDITORES.rglob("*.py"):
+            if arquivo.resolve() == Path(__file__).resolve():
+                continue
+
+            if "__pycache__" in arquivo.parts:
+                continue
+
+            encontrados.append(arquivo)
+
+        return sorted(encontrados)
+
+    def nome_editor(self, caminho):
+        nome = caminho.stem
+        nome = nome.replace("editor_", "")
+        nome = nome.replace("_", " ")
+        return nome.title()
+
+    def atualizar_editores(self):
+        for widget in self.lista_editores.winfo_children():
+            widget.destroy()
+
+        self.editores = self.descobrir_editores()
+
+        if not self.editores:
+            ttk.Label(
+                self.lista_editores,
+                text="Nenhum arquivo Python encontrado em editores/."
+            ).pack(anchor="w")
+            return
+
+        for caminho in self.editores:
+            relativo = caminho.relative_to(PASTA_EDITORES)
+            nome = self.nome_editor(caminho)
+
+            card = ttk.Frame(
+                self.lista_editores,
+                padding=12
+            )
+            card.pack(fill="x", pady=5)
+
+            ttk.Label(
+                card,
+                text=nome,
+                font=("Segoe UI", 12, "bold")
+            ).pack(anchor="w")
+
+            ttk.Label(
+                card,
+                text=str(relativo),
+                style="Subtitulo.TLabel"
+            ).pack(anchor="w", pady=(3, 8))
+
+            ttk.Button(
+                card,
+                text="Abrir editor",
+                command=lambda p=caminho: self.abrir_editor(p)
+            ).pack(anchor="e")
+
+    def atualizar_inventario(self):
+        self.atualizar_editores()
+
+        self.arvore.delete(*self.arvore.get_children())
+
+        raiz_id = self.arvore.insert(
+            "",
+            "end",
+            text="editores/",
+            values=("Diretório",),
+            open=True
+        )
+
+        quantidade_arquivos = 0
+
+        def percorrer(pasta, pai):
+            nonlocal quantidade_arquivos
+
+            try:
+                itens = sorted(
+                    pasta.iterdir(),
+                    key=lambda p: (p.is_file(), p.name.lower())
+                )
+            except PermissionError:
+                return
+
+            for item in itens:
+                if item.name == "__pycache__":
+                    continue
+
+                if item.is_dir():
+                    identificador = self.arvore.insert(
+                        pai,
+                        "end",
+                        text=item.name + "/",
+                        values=("Diretório",),
+                        open=False
+                    )
+                    percorrer(item, identificador)
+
+                else:
+                    quantidade_arquivos += 1
+                    self.arvore.insert(
+                        pai,
+                        "end",
+                        text=item.name,
+                        values=(item.suffix or "Arquivo",)
+                    )
+
+        percorrer(PASTA_EDITORES, raiz_id)
+
+        self.status.config(
+            text=f"{len(self.editores)} scripts Python encontrados | "
+                 f"{quantidade_arquivos} arquivos no total."
+        )
+
+    def abrir_editor(self, caminho):
+        try:
+            processo = subprocess.Popen(
+                [sys.executable, str(caminho)],
+                cwd=str(RAIZ)
+            )
+
+            self.processos[processo.pid] = {
+                "processo": processo,
+                "nome": self.nome_editor(caminho)
+            }
+
+            self.status.config(
+                text=f"Editor aberto: {self.nome_editor(caminho)}"
+            )
+
+        except Exception as erro:
+            self.status.config(text=f"Erro ao abrir editor: {erro}")
+
+    def monitorar_processos(self):
+        encerrados = []
+
+        for pid, dados in self.processos.items():
+            processo = dados["processo"]
+
+            if processo.poll() is not None:
+                encerrados.append(pid)
+                self.status.config(
+                    text=f"{dados['nome']} encerrado. "
+                         "Você voltou à central."
+                )
+
+        for pid in encerrados:
+            del self.processos[pid]
+
+        self.janela.after(700, self.monitorar_processos)
+
+    def abrir_pasta(self):
+        os.startfile(str(PASTA_EDITORES))
+
+if __name__ == "__main__":
+    janela = tk.Tk()
+    app = CentralEditores(janela)
+    janela.mainloop()

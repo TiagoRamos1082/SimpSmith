@@ -20,7 +20,12 @@ from interface.interface_menu import InterfaceMenu
 
 def criar_partida():
     mapa = Mapa()
-    jogador = Jogador(550, 500)
+    spawn = mapa.spawn_jogador
+
+    jogador = Jogador(
+        spawn["x"],
+        spawn["y"]
+    )
 
     tutorial = Tutorial()
     spawn = SpawnMinerios(mapa)
@@ -34,7 +39,7 @@ def criar_partida():
     )
 
     mineracao = Mineracao(inventario)
-    crafting = Crafting(mapa)
+    crafting = Crafting(mapa, inventario)
 
     return {
         "mapa": mapa,

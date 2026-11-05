@@ -1,0 +1,755 @@
+﻿import json
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from pathlib import Path
+
+import pygame
+
+
+RAIZ = Path(__file__).resolve().parents[2]
+DESTINO_PADRAO = RAIZ / "assets" / "tiles" / "importados"
+
+FUNDO = "#20232B"
+PAINEL = "#292D36"
+CAMPO = "#343842"
+TEXTO = "#F0F0F0"
+SECUNDARIA = "#A5AAB5"
+DESTAQUE = "#7AA2F7"
+VERDE = "#9ECE6A"
+
+
+class ImportadorTiles:
+    def __init__(self, janela):
+        self.janela = janela
+        self.janela.title("SimpSmith | Importador de Tiles")
+        self.janela.geometry("1250x820")
+        self.janela.minsize(900, 650)
+        self.janela.configure(bg=FUNDO)
+
+        self.imagem = None
+        self.caminho_imagem = None
+        self.imagem_tk = None
+        self.fator = 1.0
+        self.offset_x = 0
+        self.offset_y = 0
+
+        self.modo = tk.StringVar(value="grade")
+        self.largura_tile = tk.IntVar(value=12)
+        self.altura_tile = tk.IntVar(value=12)
+        self.margem_x = tk.IntVar(value=0)
+        self.margem_y = tk.IntVar(value=0)
+        self.espaco_x = tk.IntVar(value=0)
+        self.espaco_y = tk.IntVar(value=0)
+
+        self.retangulos = []
+        self.retangulo_atual = None
+        self.inicio_manual = None
+
+        self.selecionados = set()
+        self.todos_selecionados = True
+
+        self.criar_interface()
+
+    # ---------------------------------------------------------
+    # INTERFACE
+    # ---------------------------------------------------------
+
+    def criar_interface(self):
+        topo = tk.Frame(self.janela, bg=FUNDO)
+        topo.pack(fill="x", padx=25, pady=(20, 12))
+
+        tk.Label(
+            topo,
+            text="Importador de Tiles",
+            bg=FUNDO,
+            fg=TEXTO,
+            font=("Segoe UI", 22, "bold")
+        ).pack(anchor="w")
+
+        tk.Label(
+            topo,
+            text="IMPORTAÇÃO E RECORTE DE SPRITESHEETS",
+            bg=FUNDO,
+            fg=SECUNDARIA,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", pady=(3, 0))
+
+        linha = tk.Frame(self.janela, bg="#414652", height=1)
+        linha.pack(fill="x", padx=25, pady=(0, 12))
+
+        principal = tk.Frame(self.janela, bg=FUNDO)
+        principal.pack(fill="both", expand=True, padx=25, pady=5)
+
+        esquerda = tk.Frame(principal, bg=PAINEL, width=280)
+        esquerda.pack(side="left", fill="y", padx=(0, 12))
+        esquerda.pack_propagate(False)
+
+        direita = tk.Frame(principal, bg=FUNDO)
+        direita.pack(side="left", fill="both", expand=True)
+
+        self.criar_painel(esquerda)
+        self.criar_visualizacao(direita)
+
+        rodape = tk.Frame(self.janela, bg=FUNDO)
+        rodape.pack(fill="x", padx=25, pady=(8, 18))
+
+        self.status = tk.Label(
+            rodape,
+            text="Selecione uma imagem para começar.",
+            bg=FUNDO,
+            fg=SECUNDARIA,
+            font=("Segoe UI", 9)
+        )
+        self.status.pack(side="left")
+
+        self.botao(
+            rodape,
+            "EXPORTAR TILES",
+            self.exportar,
+            destaque=True
+        ).pack(side="right")
+
+    def criar_painel(self, pai):
+        tk.Label(
+            pai,
+            text="CONFIGURAÇÕES",
+            bg=PAINEL,
+            fg=DESTAQUE,
+            font=("Segoe UI", 10, "bold")
+        ).pack(anchor="w", padx=15, pady=(18, 12))
+
+        self.botao(
+            pai,
+            "ESCOLHER IMAGEM",
+            self.escolher_imagem
+        ).pack(fill="x", padx=15, pady=4)
+
+        self.label_imagem = tk.Label(
+            pai,
+            text="Nenhuma imagem selecionada",
+            bg=PAINEL,
+            fg=SECUNDARIA,
+            font=("Segoe UI", 8),
+            wraplength=240
+        )
+        self.label_imagem.pack(fill="x", padx=15, pady=(3, 15))
+
+        self.separador(pai)
+
+        tk.Label(
+            pai,
+            text="MODO DE RECORTE",
+            bg=PAINEL,
+            fg=TEXTO,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=15, pady=(12, 5))
+
+        ttk.Radiobutton(
+            pai,
+            text="Grade automática",
+            variable=self.modo,
+            value="grade",
+            command=self.atualizar_visualizacao
+        ).pack(anchor="w", padx=15, pady=3)
+
+        ttk.Radiobutton(
+            pai,
+            text="Recorte manual",
+            variable=self.modo,
+            value="manual",
+            command=self.atualizar_visualizacao
+        ).pack(anchor="w", padx=15, pady=3)
+
+        self.separador(pai)
+
+        tk.Label(
+            pai,
+            text="DIMENSÕES DOS TILES",
+            bg=PAINEL,
+            fg=TEXTO,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=15, pady=(12, 7))
+
+        self.campo(pai, "Largura (px)", self.largura_tile)
+        self.campo(pai, "Altura (px)", self.altura_tile)
+
+        self.separador(pai)
+
+        tk.Label(
+            pai,
+            text="MARGENS E ESPAÇAMENTO",
+            bg=PAINEL,
+            fg=TEXTO,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=15, pady=(12, 7))
+
+        self.campo(pai, "Margem horizontal", self.margem_x)
+        self.campo(pai, "Margem vertical", self.margem_y)
+        self.campo(pai, "Espaço horizontal", self.espaco_x)
+        self.campo(pai, "Espaço vertical", self.espaco_y)
+
+        self.separador(pai)
+
+        self.info_grade = tk.Label(
+            pai,
+            text="Grade: aguardando imagem",
+            bg=PAINEL,
+            fg=VERDE,
+            font=("Segoe UI", 9, "bold")
+        )
+        self.info_grade.pack(anchor="w", padx=15, pady=12)
+
+        self.botao(
+            pai,
+            "ATUALIZAR PRÉVIA",
+            self.atualizar_visualizacao
+        ).pack(fill="x", padx=15, pady=4)
+
+        self.botao(
+            pai,
+            "LIMPAR RECORTES",
+            self.limpar_recortes
+        ).pack(fill="x", padx=15, pady=4)
+
+    def criar_visualizacao(self, pai):
+        barra = tk.Frame(pai, bg=FUNDO)
+        barra.pack(fill="x", pady=(0, 8))
+
+        tk.Label(
+            barra,
+            text="PRÉ-VISUALIZAÇÃO",
+            bg=FUNDO,
+            fg=TEXTO,
+            font=("Segoe UI", 10, "bold")
+        ).pack(side="left")
+
+        tk.Label(
+            barra,
+            text="No modo manual, arraste o mouse para criar recortes.",
+            bg=FUNDO,
+            fg=SECUNDARIA,
+            font=("Segoe UI", 8)
+        ).pack(side="right")
+
+        area = tk.Frame(pai, bg=PAINEL)
+        area.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(
+            area,
+            bg="#17191F",
+            highlightthickness=0
+        )
+        self.canvas.pack(fill="both", expand=True)
+
+        self.canvas.bind("<Configure>", lambda e: self.atualizar_visualizacao())
+        self.canvas.bind("<ButtonPress-1>", self.iniciar_recorte)
+        self.canvas.bind("<B1-Motion>", self.arrastar_recorte)
+        self.canvas.bind("<ButtonRelease-1>", self.finalizar_recorte)
+
+    def campo(self, pai, nome, variavel):
+        linha = tk.Frame(pai, bg=PAINEL)
+        linha.pack(fill="x", padx=15, pady=3)
+
+        tk.Label(
+            linha,
+            text=nome,
+            bg=PAINEL,
+            fg=SECUNDARIA,
+            font=("Segoe UI", 8)
+        ).pack(side="left")
+
+        entrada = tk.Entry(
+            linha,
+            textvariable=variavel,
+            width=7,
+            bg=CAMPO,
+            fg=TEXTO,
+            insertbackground=TEXTO,
+            relief="flat",
+            justify="center"
+        )
+        entrada.pack(side="right", ipady=4)
+
+        entrada.bind("<Return>", lambda e: self.atualizar_visualizacao())
+
+    def botao(self, pai, texto, comando, destaque=False):
+        return tk.Button(
+            pai,
+            text=texto,
+            command=comando,
+            bg=DESTAQUE if destaque else CAMPO,
+            fg="#17191F" if destaque else TEXTO,
+            activebackground="#91B4FF",
+            activeforeground="#17191F",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=9,
+            cursor="hand2",
+            font=("Segoe UI", 9, "bold")
+        )
+
+    def separador(self, pai):
+        tk.Frame(pai, bg="#414652", height=1).pack(
+            fill="x",
+            padx=15,
+            pady=9
+        )
+
+    # ---------------------------------------------------------
+    # IMAGEM E PRÉ-VISUALIZAÇÃO
+    # ---------------------------------------------------------
+
+    def escolher_imagem(self):
+        caminho = filedialog.askopenfilename(
+            title="Selecionar spritesheet",
+            filetypes=[
+                ("Imagens", "*.png *.jpg *.jpeg *.bmp"),
+                ("Todos os arquivos", "*.*")
+            ]
+        )
+
+        if not caminho:
+            return
+
+        try:
+            nova_imagem = pygame.image.load(caminho)
+
+            self.imagem = nova_imagem.copy()
+            self.caminho_imagem = Path(caminho)
+            self.retangulos.clear()
+            self.selecionados.clear()
+
+            largura, altura = self.imagem.get_size()
+
+            self.label_imagem.config(
+                text=f"{self.caminho_imagem.name}\n{largura} x {altura} px"
+            )
+
+            self.status.config(
+                text=f"Imagem carregada: {largura} x {altura} px"
+            )
+
+            self.atualizar_visualizacao()
+
+        except Exception as erro:
+            messagebox.showerror(
+                "Erro ao abrir imagem",
+                str(erro)
+            )
+
+    def atualizar_visualizacao(self):
+        self.canvas.delete("all")
+
+        if self.imagem is None:
+            self.canvas.create_text(
+                350,
+                200,
+                text="Selecione uma imagem para visualizar",
+                fill=SECUNDARIA,
+                font=("Segoe UI", 13)
+            )
+            return
+
+        try:
+            largura = self.imagem.get_width()
+            altura = self.imagem.get_height()
+
+            cw = max(self.canvas.winfo_width(), 1)
+            ch = max(self.canvas.winfo_height(), 1)
+
+            self.fator = min(
+                (cw - 30) / largura,
+                (ch - 30) / altura,
+                1.0
+            )
+
+            largura_exibida = max(1, int(largura * self.fator))
+            altura_exibida = max(1, int(altura * self.fator))
+
+            imagem_preview = pygame.transform.scale(
+                self.imagem,
+                (largura_exibida, altura_exibida)
+            )
+
+            pygame.image.save(
+                imagem_preview,
+                str(RAIZ / "preview_importador.png")
+            )
+
+            self.imagem_tk = tk.PhotoImage(
+                file=str(RAIZ / "preview_importador.png")
+            )
+
+            self.offset_x = (cw - largura_exibida) // 2
+            self.offset_y = (ch - altura_exibida) // 2
+
+            self.canvas.create_image(
+                self.offset_x,
+                self.offset_y,
+                image=self.imagem_tk,
+                anchor="nw"
+            )
+
+            if self.modo.get() == "grade":
+                self.desenhar_grade()
+
+            else:
+                self.desenhar_recortes_manuais()
+
+        except Exception as erro:
+            self.status.config(text=f"Erro na prévia: {erro}")
+
+    # ---------------------------------------------------------
+    # GRADE AUTOMÁTICA
+    # ---------------------------------------------------------
+
+    def obter_grade(self):
+        try:
+            wt = int(self.largura_tile.get())
+            ht = int(self.altura_tile.get())
+            mx = int(self.margem_x.get())
+            my = int(self.margem_y.get())
+            sx = int(self.espaco_x.get())
+            sy = int(self.espaco_y.get())
+
+            if min(wt, ht) <= 0 or min(mx, my, sx, sy) < 0:
+                raise ValueError
+
+            largura = self.imagem.get_width()
+            altura = self.imagem.get_height()
+
+            colunas = max(
+                0,
+                (largura - mx + sx) // (wt + sx)
+            )
+
+            linhas = max(
+                0,
+                (altura - my + sy) // (ht + sy)
+            )
+
+            return colunas, linhas
+
+        except (ValueError, TypeError):
+            return 0, 0
+
+    def obter_retangulos_grade(self):
+        colunas, linhas = self.obter_grade()
+
+        wt = self.largura_tile.get()
+        ht = self.altura_tile.get()
+        mx = self.margem_x.get()
+        my = self.margem_y.get()
+        sx = self.espaco_x.get()
+        sy = self.espaco_y.get()
+
+        resultado = []
+
+        for y in range(linhas):
+            for x in range(colunas):
+                rect = pygame.Rect(
+                    mx + x * (wt + sx),
+                    my + y * (ht + sy),
+                    wt,
+                    ht
+                )
+
+                if rect.right <= self.imagem.get_width() and rect.bottom <= self.imagem.get_height():
+                    resultado.append({
+                        "rect": rect,
+                        "id": f"tile_{x}_{y}",
+                        "coluna": x,
+                        "linha": y
+                    })
+
+        return resultado
+
+    def desenhar_grade(self):
+        tiles = self.obter_retangulos_grade()
+
+        for tile in tiles:
+            rect = tile["rect"]
+
+            x1 = self.offset_x + rect.x * self.fator
+            y1 = self.offset_y + rect.y * self.fator
+            x2 = x1 + rect.width * self.fator
+            y2 = y1 + rect.height * self.fator
+
+            self.canvas.create_rectangle(
+                x1, y1, x2, y2,
+                outline="#7AA2F7",
+                width=1
+            )
+
+        colunas, linhas = self.obter_grade()
+
+        self.info_grade.config(
+            text=f"Grade: {colunas} colunas x {linhas} linhas\n"
+                 f"Total: {len(tiles)} células"
+        )
+
+    # ---------------------------------------------------------
+    # RECORTE MANUAL
+    # ---------------------------------------------------------
+
+    def iniciar_recorte(self, evento):
+        if self.imagem is None or self.modo.get() != "manual":
+            return
+
+        self.inicio_manual = self.converter_coordenadas(
+            evento.x,
+            evento.y
+        )
+
+        if self.inicio_manual is None:
+            return
+
+        x, y = evento.x, evento.y
+
+        self.retangulo_atual = self.canvas.create_rectangle(
+            x, y, x, y,
+            outline=VERDE,
+            width=2
+        )
+
+    def arrastar_recorte(self, evento):
+        if self.retangulo_atual is None:
+            return
+
+        x1, y1 = self.inicio_manual
+        x2 = (evento.x - self.offset_x) / self.fator
+        y2 = (evento.y - self.offset_y) / self.fator
+
+        self.canvas.coords(
+            self.retangulo_atual,
+            self.offset_x + x1 * self.fator,
+            self.offset_y + y1 * self.fator,
+            self.offset_x + x2 * self.fator,
+            self.offset_y + y2 * self.fator
+        )
+
+    def finalizar_recorte(self, evento):
+        if self.retangulo_atual is None:
+            return
+
+        final = self.converter_coordenadas(
+            evento.x,
+            evento.y
+        )
+
+        if final is None:
+            self.canvas.delete(self.retangulo_atual)
+            self.retangulo_atual = None
+            return
+
+        x1, y1 = self.inicio_manual
+        x2, y2 = final
+
+        esquerda = min(x1, x2)
+        topo = min(y1, y2)
+        largura = abs(x2 - x1)
+        altura = abs(y2 - y1)
+
+        rect = pygame.Rect(
+            esquerda,
+            topo,
+            largura,
+            altura
+        ).clip(
+            pygame.Rect(
+                0, 0,
+                self.imagem.get_width(),
+                self.imagem.get_height()
+            )
+        )
+
+        self.canvas.delete(self.retangulo_atual)
+        self.retangulo_atual = None
+
+        if rect.width < 1 or rect.height < 1:
+            return
+
+        self.retangulos.append(rect)
+        self.atualizar_visualizacao()
+
+        self.info_grade.config(
+            text=f"Recortes manuais: {len(self.retangulos)}"
+        )
+
+    def converter_coordenadas(self, x, y):
+        if self.imagem is None:
+            return None
+
+        px = (x - self.offset_x) / self.fator
+        py = (y - self.offset_y) / self.fator
+
+        if not (
+            0 <= px < self.imagem.get_width()
+            and 0 <= py < self.imagem.get_height()
+        ):
+            return None
+
+        return int(px), int(py)
+
+    def desenhar_recortes_manuais(self):
+        for indice, rect in enumerate(self.retangulos):
+            x1 = self.offset_x + rect.x * self.fator
+            y1 = self.offset_y + rect.y * self.fator
+            x2 = x1 + rect.width * self.fator
+            y2 = y1 + rect.height * self.fator
+
+            self.canvas.create_rectangle(
+                x1, y1, x2, y2,
+                outline=VERDE,
+                width=2
+            )
+
+            self.canvas.create_text(
+                x1 + 5,
+                y1 + 5,
+                text=str(indice + 1),
+                fill=VERDE,
+                anchor="nw",
+                font=("Segoe UI", 9, "bold")
+            )
+
+        self.info_grade.config(
+            text=f"Recortes manuais: {len(self.retangulos)}"
+        )
+
+    def limpar_recortes(self):
+        self.retangulos.clear()
+        self.selecionados.clear()
+        self.atualizar_visualizacao()
+
+    # ---------------------------------------------------------
+    # EXPORTAÇÃO
+    # ---------------------------------------------------------
+
+    def exportar(self):
+        if self.imagem is None:
+            messagebox.showwarning(
+                "Imagem necessária",
+                "Selecione uma imagem primeiro."
+            )
+            return
+
+        if self.modo.get() == "grade":
+            tiles = self.obter_retangulos_grade()
+        else:
+            tiles = [
+                {
+                    "rect": rect,
+                    "id": f"tile_manual_{i + 1}",
+                    "coluna": None,
+                    "linha": None
+                }
+                for i, rect in enumerate(self.retangulos)
+            ]
+
+        if not tiles:
+            messagebox.showwarning(
+                "Nenhum recorte",
+                "Não existem recortes para exportar."
+            )
+            return
+
+        destino = filedialog.askdirectory(
+            title="Escolher pasta de destino",
+            initialdir=str(DESTINO_PADRAO)
+        )
+
+        if not destino:
+            return
+
+        destino = Path(destino)
+        destino.mkdir(parents=True, exist_ok=True)
+
+        manifesto = []
+        exportados = 0
+
+        try:
+            for tile in tiles:
+                rect = tile["rect"]
+                imagem_tile = self.imagem.subsurface(rect).copy()
+
+                possui_pixels = any(
+                    imagem_tile.get_at((x, y)).a > 0
+                    for x in range(imagem_tile.get_width())
+                    for y in range(imagem_tile.get_height())
+                )
+
+                if not possui_pixels:
+                    continue
+
+                nome = tile["id"] + ".png"
+                pygame.image.save(
+                    imagem_tile,
+                    str(destino / nome)
+                )
+
+                manifesto.append({
+                    "id": tile["id"],
+                    "arquivo": nome,
+                    "coluna": tile["coluna"],
+                    "linha": tile["linha"],
+                    "x_original": rect.x,
+                    "y_original": rect.y,
+                    "largura": rect.width,
+                    "altura": rect.height
+                })
+
+                exportados += 1
+
+            dados = {
+                "origem": str(self.caminho_imagem),
+                "modo": self.modo.get(),
+                "dimensoes_imagem": {
+                    "largura": self.imagem.get_width(),
+                    "altura": self.imagem.get_height()
+                },
+                "sprites": manifesto
+            }
+
+            with (destino / "manifesto.json").open(
+                "w",
+                encoding="utf-8"
+            ) as arquivo:
+                json.dump(
+                    dados,
+                    arquivo,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+            self.status.config(
+                text=f"Exportação concluída: {exportados} tiles."
+            )
+
+            messagebox.showinfo(
+                "Importação concluída",
+                f"Tiles exportados: {exportados}\n\n"
+                f"Destino:\n{destino}"
+            )
+
+        except Exception as erro:
+            messagebox.showerror(
+                "Erro na exportação",
+                str(erro)
+            )
+
+
+def main():
+    pygame.init()
+
+    janela = tk.Tk()
+    ImportadorTiles(janela)
+
+    janela.mainloop()
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    main()

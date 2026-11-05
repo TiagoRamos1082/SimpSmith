@@ -1,0 +1,89 @@
+﻿import json
+from pathlib import Path
+
+import pygame
+
+
+RAIZ = Path(__file__).resolve().parents[2]
+
+ORIGEM = RAIZ / "assets" / "tiles" / "spritesheet_original.png"
+DESTINO = RAIZ / "assets" / "tiles" / "importados"
+
+TAMANHO_TILE = 12
+
+
+def importar_spritesheet():
+    pygame.init()
+
+    imagem = pygame.image.load(str(ORIGEM))
+
+    largura, altura = imagem.get_size()
+
+    colunas = largura // TAMANHO_TILE
+    linhas = altura // TAMANHO_TILE
+
+    DESTINO.mkdir(parents=True, exist_ok=True)
+
+    manifesto = []
+
+    for y in range(linhas):
+        for x in range(colunas):
+            area = pygame.Rect(
+                x * TAMANHO_TILE,
+                y * TAMANHO_TILE,
+                TAMANHO_TILE,
+                TAMANHO_TILE
+            )
+
+            tile = imagem.subsurface(area).copy()
+
+            possui_pixels = any(
+                tile.get_at((px, py)).a > 0
+                for px in range(TAMANHO_TILE)
+                for py in range(TAMANHO_TILE)
+            )
+
+            if not possui_pixels:
+                continue
+
+            nome = f"tile_{x}_{y}.png"
+            caminho = DESTINO / nome
+
+            pygame.image.save(tile, str(caminho))
+
+            manifesto.append({
+                "id": f"tile_{x}_{y}",
+                "arquivo": nome,
+                "coluna": x,
+                "linha": y,
+                "x_original": area.x,
+                "y_original": area.y,
+                "largura": TAMANHO_TILE,
+                "altura": TAMANHO_TILE
+            })
+
+    dados = {
+        "origem": str(ORIGEM.relative_to(RAIZ)),
+        "tamanho_tile": TAMANHO_TILE,
+        "colunas": colunas,
+        "linhas": linhas,
+        "sprites": manifesto
+    }
+
+    with (DESTINO / "manifesto.json").open(
+        "w", encoding="utf-8"
+    ) as arquivo:
+        json.dump(dados, arquivo, indent=4, ensure_ascii=False)
+
+    print("Importação concluída!")
+    print(f"Dimensões: {largura}x{altura}")
+    print(f"Grade: {colunas}x{linhas}")
+    print(f"Sprites exportados: {len(manifesto)}")
+    print(f"Destino: {DESTINO}")
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    importar_spritesheet()
+
