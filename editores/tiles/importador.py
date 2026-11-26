@@ -1,9 +1,34 @@
 ﻿import json
+import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 
 import pygame
+
+
+def maximizar_janela(janela):
+    """Maximiza uma janela Tkinter com fallback para ambientes Linux."""
+
+    try:
+        janela.state("zoomed")
+        return
+    except tk.TclError:
+        pass
+
+    try:
+        janela.attributes("-zoomed", True)
+        return
+    except tk.TclError:
+        pass
+
+    try:
+        janela.update_idletasks()
+        largura = janela.winfo_screenwidth()
+        altura = janela.winfo_screenheight()
+        janela.geometry(f"{largura}x{altura}+0+0")
+    except tk.TclError:
+        pass
 
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -26,7 +51,7 @@ class ImportadorTiles:
         self.janela.minsize(900, 650)
 
         self.janela.after(
-            100, lambda: self.janela.state("zoomed")
+            100, lambda: maximizar_janela(self.janela)
         )
         self.janela.configure(bg=FUNDO)
 
@@ -51,6 +76,8 @@ class ImportadorTiles:
 
         self.selecionados = set()
         self.todos_selecionados = True
+        self.nome_base = tk.StringVar(value="sprite")
+        self.camada_destino = tk.StringVar(value="terreno")
 
         self.criar_interface()
 
@@ -151,7 +178,7 @@ class ImportadorTiles:
 
         self.botao(
             rodape,
-            "EXPORTAR TILES",
+            "IMPORTAR SPRITES",
             self.exportar,
             destaque=True
         ).pack(side="right")
@@ -207,6 +234,41 @@ class ImportadorTiles:
             command=self.atualizar_visualizacao
         ).pack(anchor="w", padx=15, pady=3)
 
+        ttk.Radiobutton(
+            pai,
+            text="Imagem inteira (um sprite)",
+            variable=self.modo,
+            value="inteira",
+            command=self.atualizar_visualizacao
+        ).pack(anchor="w", padx=15, pady=3)
+
+        self.separador(pai)
+
+        tk.Label(
+            pai,
+            text="IDENTIFICAÇÃO DO SPRITE",
+            bg=PAINEL,
+            fg=TEXTO,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=15, pady=(12, 7))
+
+        self.campo(pai, "Nome base", self.nome_base)
+
+        tk.Label(
+            pai,
+            text="CAMADA DE DESTINO",
+            bg=PAINEL,
+            fg=TEXTO,
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w", padx=15, pady=(12, 5))
+
+        ttk.Combobox(
+            pai,
+            textvariable=self.camada_destino,
+            values=("terreno", "superior", "objetos"),
+            state="readonly"
+        ).pack(fill="x", padx=15, pady=(0, 8))
+
         self.separador(pai)
 
         tk.Label(
@@ -245,6 +307,18 @@ class ImportadorTiles:
             font=("Segoe UI", 9, "bold")
         )
         self.info_grade.pack(anchor="w", padx=15, pady=12)
+
+        self.botao(
+            pai,
+            "SELECIONAR TODOS",
+            self.selecionar_todos
+        ).pack(fill="x", padx=15, pady=4)
+
+        self.botao(
+            pai,
+            "LIMPAR SELEÇÃO",
+            self.limpar_selecao
+        ).pack(fill="x", padx=15, pady=4)
 
         self.botao(
             pai,
@@ -289,7 +363,7 @@ class ImportadorTiles:
         self.canvas.pack(fill="both", expand=True)
 
         self.canvas.bind("<Configure>", lambda e: self.atualizar_visualizacao())
-        self.canvas.bind("<ButtonPress-1>", self.iniciar_recorte)
+        self.canvas.bind("<ButtonPress-1>", self.tratar_clique_canvas)
         self.canvas.bind("<B1-Motion>", self.arrastar_recorte)
         self.canvas.bind("<ButtonRelease-1>", self.finalizar_recorte)
 
@@ -380,6 +454,10 @@ class ImportadorTiles:
             self.caminho_imagem = Path(caminho)
             self.retangulos.clear()
             self.selecionados.clear()
+            self.todos_selecionados = True
+
+            if not self.nome_base.get().strip() or self.nome_base.get() == "sprite":
+                self.nome_base.set(self.caminho_imagem.stem)
 
             largura, altura = self.imagem.get_size()
 
@@ -454,9 +532,12 @@ class ImportadorTiles:
 
             if self.modo.get() == "grade":
                 self.desenhar_grade()
-
-            else:
+            elif self.modo.get() == "manual":
                 self.desenhar_recortes_manuais()
+            else:
+                self.info_grade.config(
+                    text="Imagem inteira: 1 sprite selecionado"
+                )
 
         except Exception as erro:
             self.status.config(text=f"Erro na prévia: {erro}")
@@ -526,11 +607,64 @@ class ImportadorTiles:
 
         return resultado
 
-    def desenhar_grade(self):
+    def tile_esta_selecionado(self, indice):
+        if self.todos_selecionados:
+            return indice not in self.selecionados
+        return indice in self.selecionados
+
+    def tratar_clique_canvas(self, evento):
+        if self.imagem is None:
+            return
+
+        if self.modo.get() == "manual":
+            self.iniciar_recorte(evento)
+            return
+
+        if self.modo.get() != "grade":
+            return
+
+        ponto = self.converter_coordenadas(evento.x, evento.y)
+        if ponto is None:
+            return
+
         tiles = self.obter_retangulos_grade()
 
-        for tile in tiles:
+        for indice, tile in enumerate(tiles):
+            if tile["rect"].collidepoint(ponto):
+                if self.todos_selecionados:
+                    if indice in self.selecionados:
+                        self.selecionados.remove(indice)
+                    else:
+                        self.selecionados.add(indice)
+                else:
+                    if indice in self.selecionados:
+                        self.selecionados.remove(indice)
+                    else:
+                        self.selecionados.add(indice)
+
+                self.atualizar_visualizacao()
+                return
+
+    def selecionar_todos(self):
+        self.todos_selecionados = True
+        self.selecionados.clear()
+        self.atualizar_visualizacao()
+
+    def limpar_selecao(self):
+        self.todos_selecionados = False
+        self.selecionados.clear()
+        self.atualizar_visualizacao()
+
+    def desenhar_grade(self):
+        tiles = self.obter_retangulos_grade()
+        selecionados = 0
+
+        for indice, tile in enumerate(tiles):
             rect = tile["rect"]
+            ativo = self.tile_esta_selecionado(indice)
+
+            if ativo:
+                selecionados += 1
 
             x1 = self.offset_x + rect.x * self.fator
             y1 = self.offset_y + rect.y * self.fator
@@ -539,15 +673,17 @@ class ImportadorTiles:
 
             self.canvas.create_rectangle(
                 x1, y1, x2, y2,
-                outline="#7AA2F7",
-                width=1
+                outline=VERDE if ativo else "#E06C75",
+                fill="#9ECE6A" if ativo else "#E06C75",
+                stipple="gray50",
+                width=2 if ativo else 1
             )
 
         colunas, linhas = self.obter_grade()
 
         self.info_grade.config(
-            text=f"Grade: {colunas} colunas x {linhas} linhas\n"
-                 f"Total: {len(tiles)} células"
+            text=f"Grade: {colunas} colunas x {linhas} linhas\\n"
+                 f"Selecionados: {selecionados}/{len(tiles)}"
         )
 
     # ---------------------------------------------------------
@@ -680,6 +816,10 @@ class ImportadorTiles:
         )
 
     def limpar_recortes(self):
+        if self.modo.get() == "grade":
+            self.limpar_selecao()
+            return
+
         self.retangulos.clear()
         self.selecionados.clear()
         self.atualizar_visualizacao()
@@ -687,6 +827,42 @@ class ImportadorTiles:
     # ---------------------------------------------------------
     # EXPORTAÇÃO
     # ---------------------------------------------------------
+
+    def obter_nome_unico(self, pasta, nome, extensao=".png"):
+        candidato = nome
+        contador = 2
+
+        while (pasta / f"{candidato}{extensao}").exists():
+            candidato = f"{nome}_{contador}"
+            contador += 1
+
+        return candidato
+
+    def obter_tiles_exportacao(self):
+        if self.modo.get() == "inteira":
+            return [{
+                "rect": self.imagem.get_rect(),
+                "id": "sprite",
+                "coluna": None,
+                "linha": None
+            }]
+
+        if self.modo.get() == "manual":
+            return [
+                {
+                    "rect": rect,
+                    "id": f"sprite_{indice + 1:03d}",
+                    "coluna": None,
+                    "linha": None
+                }
+                for indice, rect in enumerate(self.retangulos)
+            ]
+
+        tiles = self.obter_retangulos_grade()
+        return [
+            tile for indice, tile in enumerate(tiles)
+            if self.tile_esta_selecionado(indice)
+        ]
 
     def exportar(self):
         if self.imagem is None:
@@ -696,42 +872,45 @@ class ImportadorTiles:
             )
             return
 
-        if self.modo.get() == "grade":
-            tiles = self.obter_retangulos_grade()
-        else:
-            tiles = [
-                {
-                    "rect": rect,
-                    "id": f"tile_manual_{i + 1}",
-                    "coluna": None,
-                    "linha": None
-                }
-                for i, rect in enumerate(self.retangulos)
-            ]
+        nome_base = re.sub(
+            r"[^a-zA-Z0-9_-]+",
+            "_",
+            self.nome_base.get().strip()
+        ).strip("_-")
 
-        if not tiles:
+        if not nome_base:
             messagebox.showwarning(
-                "Nenhum recorte",
-                "Não existem recortes para exportar."
+                "Nome inválido",
+                "Informe um nome válido para os sprites."
             )
             return
 
-        destino = filedialog.askdirectory(
-            title="Escolher pasta de destino",
-            initialdir=str(DESTINO_PADRAO)
-        )
-
-        if not destino:
+        camada = self.camada_destino.get()
+        if camada not in ("terreno", "superior", "objetos"):
+            messagebox.showwarning(
+                "Camada inválida",
+                "Selecione uma camada de destino válida."
+            )
             return
 
-        destino = Path(destino)
-        destino.mkdir(parents=True, exist_ok=True)
+        tiles = self.obter_tiles_exportacao()
 
-        manifesto = []
-        exportados = 0
+        if not tiles:
+            messagebox.showwarning(
+                "Nenhum sprite selecionado",
+                "Selecione pelo menos um sprite para importar."
+            )
+            return
+
+        destino = RAIZ / "assets" / "tiles" / camada
 
         try:
-            for tile in tiles:
+            destino.mkdir(parents=True, exist_ok=True)
+
+            manifesto = []
+            exportados = 0
+
+            for indice, tile in enumerate(tiles, start=1):
                 rect = tile["rect"]
                 imagem_tile = self.imagem.subsurface(rect).copy()
 
@@ -744,15 +923,23 @@ class ImportadorTiles:
                 if not possui_pixels:
                     continue
 
-                nome = tile["id"] + ".png"
+                if self.modo.get() == "inteira":
+                    nome_sugerido = nome_base
+                else:
+                    nome_sugerido = f"{nome_base}_{indice:03d}"
+
+                nome = self.obter_nome_unico(destino, nome_sugerido)
+                nome_arquivo = f"{nome}.png"
+
                 pygame.image.save(
                     imagem_tile,
-                    str(destino / nome)
+                    str(destino / nome_arquivo)
                 )
 
                 manifesto.append({
-                    "id": tile["id"],
-                    "arquivo": nome,
+                    "id": nome,
+                    "arquivo": nome_arquivo,
+                    "camada": camada,
                     "coluna": tile["coluna"],
                     "linha": tile["linha"],
                     "x_original": rect.x,
@@ -763,9 +950,17 @@ class ImportadorTiles:
 
                 exportados += 1
 
+            if not exportados:
+                messagebox.showwarning(
+                    "Sprites vazios",
+                    "Os recortes selecionados não possuem pixels visíveis."
+                )
+                return
+
             dados = {
                 "origem": str(self.caminho_imagem),
                 "modo": self.modo.get(),
+                "camada": camada,
                 "dimensoes_imagem": {
                     "largura": self.imagem.get_width(),
                     "altura": self.imagem.get_height()
@@ -773,7 +968,13 @@ class ImportadorTiles:
                 "sprites": manifesto
             }
 
-            with (destino / "manifesto.json").open(
+            nome_manifesto = self.obter_nome_unico(
+                destino,
+                f"{nome_base}_manifesto",
+                ".json"
+            )
+
+            with (destino / f"{nome_manifesto}.json").open(
                 "w",
                 encoding="utf-8"
             ) as arquivo:
@@ -785,20 +986,24 @@ class ImportadorTiles:
                 )
 
             self.status.config(
-                text=f"Exportação concluída: {exportados} tiles."
+                text=f"Importação concluída: {exportados} sprites em {camada}."
             )
+
+            self.atualizar_visualizacao()
 
             messagebox.showinfo(
                 "Importação concluída",
-                f"Tiles exportados: {exportados}\n\n"
-                f"Destino:\n{destino}"
+                f"Sprites importados: {exportados}\\n"
+                f"Camada: {camada}\\n\\n"
+                f"Destino:\\n{destino}"
             )
 
         except Exception as erro:
             messagebox.showerror(
-                "Erro na exportação",
+                "Erro na importação",
                 str(erro)
             )
+
 
 
 def main():

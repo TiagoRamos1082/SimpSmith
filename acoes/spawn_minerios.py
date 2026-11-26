@@ -40,10 +40,10 @@ class SpawnMinerios:
         for area in areas_carregadas:
             item = self.catalogo.obter(area["tipo"])
 
-            if item is None or item["categoria"] not in {"minerio", "planta"}:
+            if item is None or item["categoria"] != "minerio":
                 raise ValueError(
                     f"'{area['tipo']}' não existe no catálogo como recurso "
-                    "(minerio ou planta). Confira o catálogo e o arquivo "
+                    "(minerio). Confira o catálogo e o arquivo "
                     "mapa/areas_minerios.json."
                 )
 
@@ -114,21 +114,17 @@ class SpawnMinerios:
             else:
                 self.tempos_respawn[indice] = 0.0
 
-    def _area_na_tela(self, area):
-        tela = pygame.display.get_surface()
-
-        sx = tela.get_width() / self.mapa.largura_referencia
-        sy = tela.get_height() / self.mapa.altura_referencia
-
+    def _area_no_mundo(self, area):
         return pygame.Rect(
-            round(area["x"] * sx),
-            round(area["y"] * sy),
-            round(area["largura"] * sx),
-            round(area["altura"] * sy),
+            area["x"],
+            area["y"],
+            area["largura"],
+            area["altura"]
         )
 
+
     def _minerios_da_area(self, indice):
-        area = self._area_na_tela(self.areas[indice])
+        area = self._area_no_mundo(self.areas[indice])
 
         return [
             minerio
@@ -138,7 +134,7 @@ class SpawnMinerios:
         ]
 
     def _criar_minerio(self, indice, jogador):
-        area = self._area_na_tela(self.areas[indice])
+        area = self._area_no_mundo(self.areas[indice])
         tamanho = self.TAMANHO_MINERIO
 
         if area.width < tamanho or area.height < tamanho:
@@ -184,6 +180,6 @@ class SpawnMinerios:
             self.minerios.remove(minerio)
             self.tempos_respawn[indice] = 0.0
 
-    def desenhar(self, tela):
+    def desenhar(self, tela, camera=None):
         for minerio in self.minerios:
-            minerio.desenhar(tela)
+            minerio.desenhar(tela, camera)

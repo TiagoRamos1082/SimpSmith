@@ -39,12 +39,6 @@ EDITORES = {
     ],
     "TILES E SPRITES": [
         {
-            "nome": "Editor de Sprites",
-            "descricao": "Organizacao e edicao dos sprites.",
-            "arquivo": "tiles/editor_sprites.py",
-            "icone": "SPR"
-        },
-        {
             "nome": "Importador de Tiles",
             "descricao": "Importacao de tiles para o projeto.",
             "arquivo": "tiles/importador.py",
@@ -54,12 +48,36 @@ EDITORES = {
 }
 
 
+def maximizar_janela(janela):
+    """Maximiza uma janela Tkinter com fallback para ambientes Linux."""
+
+    try:
+        janela.state("zoomed")
+        return
+    except tk.TclError:
+        pass
+
+    try:
+        janela.attributes("-zoomed", True)
+        return
+    except tk.TclError:
+        pass
+
+    try:
+        janela.update_idletasks()
+        largura = janela.winfo_screenwidth()
+        altura = janela.winfo_screenheight()
+        janela.geometry(f"{largura}x{altura}+0+0")
+    except tk.TclError:
+        pass
+
+
 class CentralEditores:
     def __init__(self, janela):
         self.janela = janela
         self.janela.title("SimpSmith | Central de Editores")
         self.janela.geometry("1050x760")
-        self.janela.after(100, lambda: self.janela.state("zoomed"))
+        self.janela.after(100, lambda: maximizar_janela(self.janela))
         self.janela.minsize(850, 650)
         self.processos = []
         self._scroll_resto = 0
@@ -196,7 +214,7 @@ class CentralEditores:
         tk.Button(
             rodape,
             text="ABRIR PASTA",
-            command=lambda: os.startfile(str(PASTA_EDITORES)),
+            command=lambda: self.abrir_pasta(PASTA_EDITORES),
             bg="#343842",
             fg=self.cor_texto,
             activebackground="#454B59",
@@ -326,6 +344,23 @@ class CentralEditores:
             pady=7,
             cursor="hand2" if existe else "arrow"
         ).pack(anchor="e")
+
+    def abrir_pasta(self, caminho):
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(caminho))
+
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(caminho)])
+
+            else:
+                subprocess.Popen(["xdg-open", str(caminho)])
+
+        except Exception as erro:
+            messagebox.showerror(
+                "Erro ao abrir pasta",
+                f"Não foi possível abrir a pasta.\\n\\n{erro}"
+            )
 
     def abrir_editor(self, caminho, nome):
         try:

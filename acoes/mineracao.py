@@ -1,4 +1,4 @@
-﻿
+
 import pygame
 
 
@@ -122,16 +122,21 @@ class Mineracao:
         for recurso in spawn.minerios:
             recurso_rect = recurso.rect
 
-            encostando_ou_dentro = (
-                jogador_rect.left <= recurso_rect.right
-                and jogador_rect.right >= recurso_rect.left
-                and jogador_rect.top <= recurso_rect.bottom
-                and jogador_rect.bottom >= recurso_rect.top
+            areas_interacao = getattr(
+                recurso, "areas_interacao", None
             )
 
-            olhando_para_recurso = sensor.colliderect(recurso_rect)
+            # A interacao utiliza a mesma geometria configurada
+            # no editor para a colisao do recurso.
+            if areas_interacao is None:
+                areas_interacao = [recurso_rect]
 
-            if encostando_ou_dentro and olhando_para_recurso:
+            olhando_para_recurso = any(
+                sensor.colliderect(area)
+                for area in areas_interacao
+            )
+
+            if olhando_para_recurso:
                 dx = jogador_rect.centerx - recurso_rect.centerx
                 dy = jogador_rect.centery - recurso_rect.centery
                 distancia = dx ** 2 + dy ** 2
@@ -201,7 +206,7 @@ class Mineracao:
 
             mensagem = (
                 "Coletando..."
-                if self.alvo.categoria == "planta"
+                if self.alvo.categoria == "minerio"
                 else "Minerando..."
             )
 

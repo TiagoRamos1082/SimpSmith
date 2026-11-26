@@ -1,6 +1,7 @@
 ﻿
 import pygame
 from sistemas.catalogo_itens import CatalogoItens
+from sistemas.carregador_imagens import obter_imagem
 
 
 class InterfaceInventario:
@@ -558,6 +559,17 @@ class InterfaceInventario:
             border_radius=8
         )
 
+        imagem = obter_imagem(
+            dados.get("imagem"),
+            icone.size
+        )
+
+        if imagem is not None:
+            camada.blit(
+                imagem,
+                imagem.get_rect(center=icone.center)
+            )
+
         nome = self.fonte.render(
             dados["nome"], True, self.COR_DESTAQUE
         )
@@ -773,17 +785,30 @@ class InterfaceInventario:
             y + self.TAMANHO_SLOT // 2
         )
 
+        area_icone = pygame.Rect(
+            centro[0] - tamanho // 2,
+            centro[1] - tamanho // 2,
+            tamanho,
+            tamanho
+        )
+
         pygame.draw.rect(
             tela,
             cor,
-            pygame.Rect(
-                centro[0] - tamanho // 2,
-                centro[1] - tamanho // 2,
-                tamanho,
-                tamanho
-            ),
+            area_icone,
             border_radius=5
         )
+
+        imagem = obter_imagem(
+            dados_item.get("imagem"),
+            (tamanho, tamanho)
+        )
+
+        if imagem is not None:
+            tela.blit(
+                imagem,
+                imagem.get_rect(center=area_icone.center)
+            )
 
         tamanho_fonte = max(8, round(13 * tamanho / 32))
 

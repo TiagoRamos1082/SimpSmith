@@ -6,14 +6,138 @@
       "categoria": "minerio",
       "peso": 3.0,
       "preco_base": 5.0,
+      "tempo_coleta": 2.0,
       "cor": [
         150,
         150,
         150
       ],
       "solido": true,
-      "tempo_coleta": 2.0,
-      "respawn": true
+      "respawn": true,
+      "imagem": "assets/itens/minerios/ferro/ferro.png",
+      "largura_visual": 49,
+      "altura_visual": 46,
+      "colisao": [
+        {
+          "x": 21,
+          "y": 3,
+          "largura": 4,
+          "altura": 3,
+          "ativa": true
+        },
+        {
+          "x": 15,
+          "y": 6,
+          "largura": 13,
+          "altura": 3,
+          "ativa": true
+        },
+        {
+          "x": 12,
+          "y": 9,
+          "largura": 19,
+          "altura": 4,
+          "ativa": true
+        },
+        {
+          "x": 10,
+          "y": 12,
+          "largura": 26,
+          "altura": 5,
+          "ativa": true
+        },
+        {
+          "x": 5,
+          "y": 23,
+          "largura": 39,
+          "altura": 12,
+          "ativa": true
+        },
+        {
+          "x": 7,
+          "y": 22,
+          "largura": 37,
+          "altura": 1,
+          "ativa": true
+        },
+        {
+          "x": 7,
+          "y": 21,
+          "largura": 37,
+          "altura": 1,
+          "ativa": true
+        },
+        {
+          "x": 38,
+          "y": 17,
+          "largura": 4,
+          "altura": 4,
+          "ativa": true
+        },
+        {
+          "x": 10,
+          "y": 35,
+          "largura": 12,
+          "altura": 5,
+          "ativa": true
+        },
+        {
+          "x": 28,
+          "y": 37,
+          "largura": 11,
+          "altura": 3,
+          "ativa": true
+        },
+        {
+          "x": 22,
+          "y": 35,
+          "largura": 20,
+          "altura": 2,
+          "ativa": true
+        },
+        {
+          "x": 7,
+          "y": 35,
+          "largura": 3,
+          "altura": 2,
+          "ativa": true
+        },
+        {
+          "x": 7,
+          "y": 15,
+          "largura": 32,
+          "altura": 6,
+          "ativa": true
+        },
+        {
+          "x": 43,
+          "y": 19,
+          "largura": 1,
+          "altura": 1,
+          "ativa": true
+        },
+        {
+          "x": 25,
+          "y": 3,
+          "largura": 1,
+          "altura": 1,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 29,
+          "y": 28,
+          "largura": 1,
+          "altura": 1
+        },
+        {
+          "x": 26,
+          "y": 19,
+          "largura": 1,
+          "altura": 1
+        }
+      ]
     },
     {
       "id": "cobre",
@@ -28,7 +152,27 @@
       ],
       "solido": true,
       "tempo_coleta": 2.0,
-      "respawn": true
+      "respawn": true,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
     },
     {
       "id": "ouro",
@@ -43,7 +187,27 @@
       ],
       "solido": true,
       "tempo_coleta": 2.0,
-      "respawn": true
+      "respawn": true,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
     },
     {
       "id": "crystal",
@@ -58,7 +222,27 @@
         50
       ],
       "solido": true,
-      "respawn": true
+      "respawn": true,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
     },
     {
       "id": "cobalto",
@@ -73,12 +257,32 @@
         255
       ],
       "solido": true,
-      "respawn": true
+      "respawn": true,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
     },
     {
       "id": "arbusto",
       "nome": "Arbusto",
-      "categoria": "planta",
+      "categoria": "minerio",
       "peso": 0.5,
       "preco_base": 2.0,
       "cor": [
@@ -88,7 +292,27 @@
       ],
       "solido": false,
       "tempo_coleta": 2.0,
-      "respawn": true
+      "respawn": true,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32,
+          "ativa": false
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
     },
     {
       "id": "barra_ferro",
@@ -103,7 +327,104 @@
       ],
       "solido": false,
       "tempo_coleta": 2.0,
-      "respawn": false
+      "respawn": false,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 18,
+          "y": 16,
+          "largura": 1,
+          "altura": 1,
+          "ativa": false
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
+    },
+    {
+      "id": "carvao",
+      "nome": "Carvão",
+      "categoria": "minerio",
+      "peso": 1.0,
+      "preco_base": 0.5,
+      "tempo_coleta": 2.5,
+      "cor": [
+        0,
+        0,
+        0
+      ],
+      "solido": true,
+      "respawn": true,
+      "imagem": null,
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "colisao": [
+        {
+          "x": 14,
+          "y": 20,
+          "largura": 1,
+          "altura": 1,
+          "ativa": true
+        },
+        {
+          "x": 1,
+          "y": 10,
+          "largura": 6,
+          "altura": 5,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
+    },
+    {
+      "id": "bigorna",
+      "nome": "Bigorna",
+      "categoria": "construcao",
+      "peso": 15.0,
+      "preco_base": 0.0,
+      "cor": [
+        150,
+        150,
+        150
+      ],
+      "imagem": "assets/itens/construcoes/bigorna/bigorna.png",
+      "largura_visual": 32,
+      "altura_visual": 32,
+      "tempo_coleta": 2.0,
+      "solido": true,
+      "respawn": true,
+      "colisao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32,
+          "ativa": true
+        }
+      ],
+      "interacao": [
+        {
+          "x": 0,
+          "y": 0,
+          "largura": 32,
+          "altura": 32
+        }
+      ]
     }
   ]
 }

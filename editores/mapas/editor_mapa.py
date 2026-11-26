@@ -1,5 +1,6 @@
 
 import json
+import copy
 import pygame
 import ctypes
 from pathlib import Path
@@ -54,7 +55,29 @@ class EditorMapa:
         self.executando = True
 
         self.carregar_mapa()
-        self.dados.setdefault("sprites_superiores", [])
+
+        # Estrutura de sprites organizada por camada.
+        sprites_por_camada = self.dados.setdefault(
+            "sprites_por_camada", {}
+        )
+
+        # Mantém compatibilidade com os editores antigos.
+        sprites_superiores = self.dados.setdefault(
+            "sprites_superiores", []
+        )
+
+        if "superior" not in sprites_por_camada:
+            sprites_por_camada["superior"] = sprites_superiores
+
+        # A nova estrutura é a fonte principal.
+        self.dados["sprites_superiores"] = sprites_por_camada["superior"]
+
+        # Garante uma lista de sprites para cada camada.
+        for nome_camada in self.dados["camadas"]:
+            sprites_por_camada.setdefault(nome_camada, [])
+
+        self.sprites_por_camada = sprites_por_camada
+
         self.sprites = {}
         self.carregar_sprites()
 
@@ -63,6 +86,8 @@ class EditorMapa:
             (self.largura_janela - self.painel_largura - 50) // self.largura,
             (self.altura_janela - 90) // self.altura
         ))
+
+        self.escala_inicial = self.escala
 
         self.painel_x = self.largura_janela - self.painel_largura
 
@@ -75,16 +100,34 @@ class EditorMapa:
         self.indice_camada = 0
 
         self.tiles = self.dados["tiles"]
-        self.tile_selecionado = next(iter(self.tiles_disponiveis), None)
-
-        self.sprite_selecionado = next(iter(self.sprites), None)
+        self.tile_selecionado = None
+        self.sprite_selecionado = None
         self.sprite_scroll = 0
         self.painel_scroll = 0
         self.painel_conteudo_altura = 0
+        self.chao_base_inicio = None
+        self.chao_base_fim = None
+        self.imagens_chao_base_redimensionadas = {}
 
-        self.modo = "pintura"
+        self.modo = "sprites"
 
         self.salvar_mensagem = ""
+
+        # Histórico de alterações.
+        self.historico = []
+        self.historico_refazer = []
+        self.limite_historico = 50
+
+        # Salvamento automático.
+        self.mapa_alterado = False
+        self.intervalo_autosalvamento = 2000
+        self.tempo_ultima_alteracao = 0
+        self.edicao_pintura_ativa = False
+        self.mostrar_grade = False
+        self.arrastando_sprites = False
+        self.sequencia_historico_ativo = False
+        self.tempo_ultimo_sprite = 0
+        self.intervalo_sprites = 150
 
     @property
     def camada_atual(self):
@@ -103,16 +146,12 @@ class EditorMapa:
             self.indice_camada + deslocamento
         ) % len(self.camadas)
 
-        disponiveis = self.tiles_disponiveis
+        self.tile_selecionado = None
+        self.sprite_selecionado = None
 
-        if self.tile_selecionado not in disponiveis:
-            self.tile_selecionado = next(iter(disponiveis), None)
-
-        self.modo = (
-            "sprites"
-            if self.camada_atual == "superior"
-            else "pintura"
-        )
+        self.sprite_scroll = 0
+        self.painel_scroll = 0
+        self.modo = "sprites"
 
     def carregar_mapa(self):
         with CAMINHO_MAPA.open("r", encoding="utf-8-sig") as arquivo:
@@ -123,17 +162,95 @@ class EditorMapa:
         self.tile_size = self.dados["tile_size"]
 
     def carregar_sprites(self):
-        pasta = RAIZ / "assets" / "tiles" / "superior"
+        pasta_base = RAIZ / "assets" / "tiles"
 
-        for caminho in pasta.rglob("*.png"):
-            identificador = caminho.relative_to(pasta).with_suffix("").as_posix()
+        self.sprites_por_camada_imagens = {}
 
-            imagem = pygame.image.load(str(caminho)).convert_alpha()
+        for camada in self.dados["camadas"]:
+            pasta = pasta_base / camada
+            biblioteca = {}
 
-            self.sprites[identificador] = {
-                "imagem": imagem,
-                "caminho": caminho.relative_to(RAIZ).as_posix()
-            }
+            if pasta.exists():
+                for caminho in pasta.rglob("*"):
+                    if not caminho.is_file():
+                        continue
+
+                    if caminho.suffix.lower() != ".png":
+                        continue
+
+                    identificador = (
+                        caminho.relative_to(pasta)
+                        .with_suffix("")
+                        .as_posix()
+                    )
+
+                    imagem = pygame.image.load(
+                        str(caminho)
+                    ).convert_alpha()
+
+                    biblioteca[identificador] = {
+                        "imagem": imagem,
+                        "caminho": caminho.relative_to(
+                            RAIZ
+                        ).as_posix()
+                    }
+
+            self.sprites_por_camada_imagens[camada] = biblioteca
+
+        # Compatibilidade temporária com o código antigo.
+        self.sprites = self.sprites_por_camada_imagens.get(
+            "superior", {}
+        )
+
+    def registrar_estado_anterior(self):
+        self.historico.append(copy.deepcopy(self.dados))
+
+        if len(self.historico) > self.limite_historico:
+            self.historico.pop(0)
+
+        self.historico_refazer.clear()
+
+    def marcar_alteracao(self):
+        self.mapa_alterado = True
+        self.tempo_ultima_alteracao = pygame.time.get_ticks()
+
+    def restaurar_referencias(self):
+        self.sprites_por_camada = self.dados["sprites_por_camada"]
+        self.dados["sprites_superiores"] = (
+            self.sprites_por_camada["superior"]
+        )
+        self.tiles = self.dados["tiles"]
+
+    def desfazer(self):
+        if not self.historico:
+            self.salvar_mensagem = "Nada para desfazer!"
+            return
+
+        self.historico_refazer.append(copy.deepcopy(self.dados))
+        self.dados = self.historico.pop()
+        self.restaurar_referencias()
+        self.marcar_alteracao()
+        self.salvar_mensagem = "Alteração desfeita!"
+
+    def refazer(self):
+        if not self.historico_refazer:
+            self.salvar_mensagem = "Nada para refazer!"
+            return
+
+        self.historico.append(copy.deepcopy(self.dados))
+        self.dados = self.historico_refazer.pop()
+        self.restaurar_referencias()
+        self.marcar_alteracao()
+        self.salvar_mensagem = "Alteração refeita!"
+
+    def processar_autosalvamento(self):
+        if not self.mapa_alterado:
+            return
+
+        agora = pygame.time.get_ticks()
+
+        if agora - self.tempo_ultima_alteracao >= self.intervalo_autosalvamento:
+            self.salvar_mapa()
 
     def salvar_mapa(self):
         try:
@@ -146,6 +263,7 @@ class EditorMapa:
                 )
 
             self.salvar_mensagem = "Mapa salvo com sucesso!"
+            self.mapa_alterado = False
 
         except OSError as erro:
             self.salvar_mensagem = f"Erro ao salvar: {erro}"
@@ -163,6 +281,7 @@ class EditorMapa:
 
     def obter_posicao_mundo(self, posicao_mouse):
         mouse_x, mouse_y = posicao_mouse
+
         fator = self.escala / self.tile_size
 
         mundo_x = (mouse_x - self.posicao_mapa_x) / fator
@@ -177,25 +296,37 @@ class EditorMapa:
         if not (0 <= mundo_y < altura_mapa):
             return None
 
-        x = int(mundo_x // 12) * 12
-        y = int(mundo_y // 12) * 12
-
-        return x, y
-
+        return round(mundo_x), round(mundo_y)
     def pintar_tile(self, x, y):
         if self.tile_selecionado not in self.tiles_disponiveis:
             return
 
-        self.dados["camadas"][self.camada_atual][y][x] = (
-            self.tile_selecionado
-        )
+        matriz = self.dados["camadas"][self.camada_atual]
+
+        if matriz[y][x] == self.tile_selecionado:
+            return
+
+        # Uma sequência contínua de pintura gera uma única ação.
+        if not self.edicao_pintura_ativa:
+            self.registrar_estado_anterior()
+            self.edicao_pintura_ativa = True
+
+        matriz[y][x] = self.tile_selecionado
+        self.marcar_alteracao()
 
     def posicionar_spawn(self, x, y):
-        self.dados["spawn_jogador"] = {
+        novo_spawn = {
             "x": x * self.tile_size,
             "y": y * self.tile_size,
             "direcao": "down"
         }
+
+        if self.dados.get("spawn_jogador") == novo_spawn:
+            return
+
+        self.registrar_estado_anterior()
+        self.dados["spawn_jogador"] = novo_spawn
+        self.marcar_alteracao()
 
         self.salvar_mensagem = "Spawn atualizado!"
 
@@ -210,94 +341,172 @@ class EditorMapa:
 
         self.tela.blit(imagem, (x, y))
 
-    def desenhar_sprites_superiores(self):
-        fator = self.escala / self.tile_size
+    def obter_rect_sprite_tela(self, sprite, camada="superior"):
+        biblioteca = self.sprites_por_camada_imagens.get(camada, {})
+        imagem = biblioteca.get(sprite["id"], {}).get("imagem")
 
-        for sprite in self.dados["sprites_superiores"]:
-            identificador = sprite["id"]
+        if imagem is None:
+            return None
 
-            if identificador not in self.sprites:
+        fator = (self.escala / self.tile_size) * 2
+
+        x = self.posicao_mapa_x + round(
+            sprite["x"] * self.escala / self.tile_size
+        )
+        y = self.posicao_mapa_y + round(
+            sprite["y"] * self.escala / self.tile_size
+        )
+
+        tamanhos = self.dados.get("tamanhos_sprites", {})
+        configuracao = tamanhos.get(camada, {}).get(sprite["id"], {})
+
+        largura_original = configuracao.get(
+            "largura", imagem.get_width()
+        )
+        altura_original = configuracao.get(
+            "altura", imagem.get_height()
+        )
+
+        largura = max(1, round(largura_original * fator))
+        altura = max(1, round(altura_original * fator))
+
+        return pygame.Rect(x, y, largura, altura)
+
+    def desenhar_sprites_camada(self, camada):
+        biblioteca = self.sprites_por_camada_imagens.get(camada, {})
+        sprites = self.sprites_por_camada.get(camada, [])
+
+        for sprite in sprites:
+            imagem = biblioteca.get(sprite["id"], {}).get("imagem")
+
+            if imagem is None:
                 continue
 
-            imagem = self.sprites[identificador]["imagem"]
-            largura = max(1, round(imagem.get_width() * fator))
-            altura = max(1, round(imagem.get_height() * fator))
+            rect = self.obter_rect_sprite_tela(sprite, camada)
 
             imagem_redimensionada = pygame.transform.scale(
-                imagem, (largura, altura)
+                imagem, rect.size
             )
 
-            x = self.posicao_mapa_x + round(sprite["x"] * fator)
-            y = self.posicao_mapa_y + round(sprite["y"] * fator)
+            self.tela.blit(imagem_redimensionada, rect.topleft)
 
-            self.tela.blit(imagem_redimensionada, (x, y))
+    def desenhar_sprites_superiores(self):
+        self.desenhar_sprites_camada("superior")
 
     def desenhar_mapa(self):
         tamanho = self.escala
 
-        for y in range(self.altura):
-            for x in range(self.largura):
-                cor = None
+        rect_fundo = pygame.Rect(
+            self.posicao_mapa_x,
+            self.posicao_mapa_y,
+            self.largura * tamanho,
+            self.altura * tamanho
+        )
 
-                # Desenha as camadas na ordem definida no JSON.
-                for nome_camada in self.camadas:
-                    identificador = (
-                        self.dados["camadas"][nome_camada][y][x]
+        pygame.draw.rect(self.tela, COR_FUNDO, rect_fundo)
+
+        # Desenha o sprite escolhido como textura repetida do chao.
+        identificador_base = self.dados.get("chao_base")
+        biblioteca_terreno = self.sprites_por_camada_imagens.get(
+            "terreno", {}
+        )
+
+        dados_sprite = biblioteca_terreno.get(identificador_base)
+
+        if dados_sprite is not None:
+            imagem = dados_sprite["imagem"]
+
+            fator = (self.escala / self.tile_size) * 2.0
+
+            chave = (
+                identificador_base,
+                round(imagem.get_width() * fator),
+                round(imagem.get_height() * fator)
+            )
+
+            imagem_tela = self.imagens_chao_base_redimensionadas.get(chave)
+
+            if imagem_tela is None:
+                dimensoes = (chave[1], chave[2])
+
+                imagem_tela = pygame.transform.scale(
+                    imagem, dimensoes
+                )
+
+                self.imagens_chao_base_redimensionadas[chave] = imagem_tela
+
+            area_visivel = rect_fundo.clip(self.tela.get_rect())
+
+            if area_visivel.width > 0 and area_visivel.height > 0:
+                clip_anterior = self.tela.get_clip()
+                self.tela.set_clip(area_visivel)
+
+                largura_sprite, altura_sprite = imagem_tela.get_size()
+
+                for y in range(
+                    rect_fundo.top, rect_fundo.bottom, altura_sprite
+                ):
+                    for x in range(
+                        rect_fundo.left, rect_fundo.right, largura_sprite
+                    ):
+                        self.tela.blit(imagem_tela, (x, y))
+
+                self.tela.set_clip(clip_anterior)
+
+        # Desenha cada camada e seus sprites na sequência.
+        for nome_camada in self.camadas:
+            matriz = self.dados["camadas"][nome_camada]
+
+            for y in range(self.altura):
+                for x in range(self.largura):
+                    identificador = matriz[y][x]
+
+                    if identificador is None:
+                        continue
+
+                    cor = self.tiles[identificador]["cor"]
+
+                    rect = pygame.Rect(
+                        self.posicao_mapa_x + x * tamanho,
+                        self.posicao_mapa_y + y * tamanho,
+                        tamanho,
+                        tamanho
                     )
 
-                    if identificador is not None:
-                        cor = self.tiles[identificador]["cor"]
+                    pygame.draw.rect(self.tela, cor, rect)
 
-                if cor is None:
-                    cor = COR_FUNDO
+            self.desenhar_sprites_camada(nome_camada)
 
-                rect = pygame.Rect(
-                    self.posicao_mapa_x + x * tamanho,
-                    self.posicao_mapa_y + y * tamanho,
-                    tamanho,
-                    tamanho
-                )
-
-                pygame.draw.rect(self.tela, cor, rect)
-                pygame.draw.rect(
-                    self.tela,
-                    COR_GRADE,
-                    rect,
-                    1
-                )
-
-        self.desenhar_sprites_superiores()
-
-        if self.camada_atual == "superior":
-            self.desenhar_grade_auxiliar()
-
+        self.desenhar_grade_auxiliar()
         self.desenhar_spawn()
-
         self.desenhar_preview_spawn()
 
     def desenhar_grade_auxiliar(self):
+        if not self.mostrar_grade:
+            return
+
         fator = self.escala / self.tile_size
         largura = self.largura * self.tile_size
         altura = self.altura * self.tile_size
 
-        largura_tela = round(largura * fator)
-        altura_tela = round(altura * fator)
+        largura_tela = max(1, round(largura * fator))
+        altura_tela = max(1, round(altura * fator))
 
         superficie = pygame.Surface(
             (largura_tela, altura_tela),
             pygame.SRCALPHA
         )
 
-        cor = (255, 255, 255, 55)
+        cor = (0, 0, 0, 110)
 
-        for x in range(0, largura + 1, 12):
+        for x in range(0, largura + 1, self.tile_size):
             posicao = round(x * fator)
             pygame.draw.line(
                 superficie, cor,
                 (posicao, 0), (posicao, altura_tela)
             )
 
-        for y in range(0, altura + 1, 12):
+        for y in range(0, altura + 1, self.tile_size):
             posicao = round(y * fator)
             pygame.draw.line(
                 superficie, cor,
@@ -377,14 +586,15 @@ class EditorMapa:
             self.painel_x + 20, 145
         )
 
-        sprites = list(self.sprites.keys())
+        biblioteca = self.sprites_por_camada_imagens[self.camada_atual]
+        sprites = list(biblioteca.keys())
         inicio = self.sprite_scroll
         visiveis = sprites[inicio:inicio + 12]
 
         y = 185
 
         for identificador in visiveis:
-            dados = self.sprites[identificador]
+            dados = biblioteca[identificador]
             imagem = dados["imagem"]
 
             largura, altura = imagem.get_size()
@@ -547,12 +757,16 @@ class EditorMapa:
 
         y += 18
 
-        # Biblioteca.
-        if self.camada_atual == "superior":
+        # Biblioteca de sprites da camada atual.
+        if self.camada_atual in self.sprites_por_camada_imagens:
             secao("SPRITES DISPONIVEIS", y)
             y += 38
 
-            sprites = list(self.sprites.items())
+            sprites = list(
+                self.sprites_por_camada_imagens[
+                    self.camada_atual
+                ].items()
+            )
             inicio = self.sprite_scroll
             altura_item = 54
 
@@ -675,6 +889,85 @@ class EditorMapa:
 
             y += 20
 
+        # Selecao independente do chao base por sprites PNG.
+        secao("CHAO BASE", y)
+        y += 38
+
+        texto(
+            "Preenche todo o mapa:",
+            y, self.fonte_pequena,
+            (170, 176, 188)
+        )
+        y += 28
+
+        biblioteca_terreno = self.sprites_por_camada_imagens.get(
+            "terreno", {}
+        )
+
+        self.chao_base_inicio = y
+        opcoes_base = [None] + list(biblioteca_terreno.keys())
+
+        for identificador in opcoes_base:
+            rect = pygame.Rect(
+                10, y - self.painel_scroll,
+                area.width - 28, 48
+            )
+
+            selecionado = (
+                self.dados.get("chao_base") == identificador
+            )
+
+            pygame.draw.rect(
+                superficie,
+                (66, 62, 43) if selecionado else (43, 47, 57),
+                rect,
+                border_radius=5
+            )
+
+            if selecionado:
+                pygame.draw.rect(
+                    superficie, COR_SELECAO,
+                    rect, 1, border_radius=5
+                )
+
+            if identificador is None:
+                nome = "Sem chao base"
+                imagem = None
+            else:
+                nome = identificador
+                imagem = biblioteca_terreno[identificador]["imagem"]
+
+            if imagem is not None:
+                largura, altura = imagem.get_size()
+                fator = min(36 / largura, 36 / altura, 1)
+                tamanho = (
+                    max(1, round(largura * fator)),
+                    max(1, round(altura * fator))
+                )
+                miniatura = pygame.transform.scale(imagem, tamanho)
+
+                superficie.blit(
+                    miniatura,
+                    (
+                        18,
+                        y + (48 - tamanho[1]) // 2
+                        - self.painel_scroll
+                    )
+                )
+
+            imagem_nome = self.fonte_pequena.render(
+                nome[:25], True, COR_TEXTO
+            )
+            superficie.blit(
+                imagem_nome,
+                (66, y + 16 - self.painel_scroll)
+            )
+
+            y += 54
+
+        self.chao_base_fim = y
+        y += 18
+
         # Ferramentas.
         secao("FERRAMENTAS", y)
         y += 40
@@ -788,6 +1081,40 @@ class EditorMapa:
 
             y_conteudo = mouse_y - 151 + self.painel_scroll
 
+            # Selecao do chao base usando exclusivamente sprites PNG.
+            if (
+                self.chao_base_inicio is not None
+                and self.chao_base_inicio <= y_conteudo < self.chao_base_fim
+            ):
+                indice = (
+                    y_conteudo - self.chao_base_inicio
+                ) // 54
+
+                biblioteca_terreno = self.sprites_por_camada_imagens.get(
+                    "terreno", {}
+                )
+                opcoes = [None] + list(biblioteca_terreno.keys())
+
+                if 0 <= indice < len(opcoes):
+                    novo_chao = opcoes[indice]
+
+                    if self.dados.get("chao_base") != novo_chao:
+                        self.registrar_estado_anterior()
+
+                        if novo_chao is None:
+                            self.dados.pop("chao_base", None)
+                        else:
+                            self.dados["chao_base"] = novo_chao
+
+                        self.marcar_alteracao()
+                        self.salvar_mensagem = (
+                            "Chao base removido!"
+                            if novo_chao is None
+                            else f"Chao base: {novo_chao}"
+                        )
+
+                return
+
             y = 42
             descricoes = self.camada_atual
 
@@ -801,7 +1128,7 @@ class EditorMapa:
             # A biblioteca começa depois da descrição da camada.
             y_biblioteca = 42 + 34 + 34 + 44
 
-            if self.camada_atual == "superior" and self.modo != "spawn":
+            if self.camada_atual in self.sprites_por_camada_imagens and self.modo != "spawn":
                 inicio_lista = y_biblioteca + 38
                 altura_item = 54
 
@@ -810,7 +1137,11 @@ class EditorMapa:
                         (y_conteudo - inicio_lista) // altura_item
                         + self.sprite_scroll
                     )
-                    sprites = list(self.sprites.keys())
+                    sprites = list(
+                        self.sprites_por_camada_imagens[
+                            self.camada_atual
+                        ].keys()
+                    )
 
                     if 0 <= indice < len(sprites):
                         self.sprite_selecionado = sprites[indice]
@@ -843,16 +1174,67 @@ class EditorMapa:
             self.pintar_tile(x, y)
 
         elif self.modo == "sprites":
-            if self.sprite_selecionado is not None:
-                self.dados["sprites_superiores"].append({
-                    "id": self.sprite_selecionado,
-                    "x": x,
-                    "y": y
-                })
-                self.salvar_mensagem = "Sprite posicionado!"
+            self.posicionar_sprite((x, y))
 
         elif self.modo == "spawn":
             self.posicionar_spawn(x, y)
+
+
+    def posicionar_sprite(self, posicao_mundo):
+        if self.sprite_selecionado is None:
+            return False
+
+        x, y = posicao_mundo
+
+        biblioteca = self.sprites_por_camada_imagens[
+            self.camada_atual
+        ]
+        imagem = biblioteca[self.sprite_selecionado]["imagem"]
+
+        # O cursor representa o centro visual do sprite.
+        x_sprite = round(x - imagem.get_width())
+        y_sprite = round(y - imagem.get_height())
+
+        # A sequencia inteira representa uma unica acao no historico.
+        if not self.sequencia_historico_ativo:
+            self.registrar_estado_anterior()
+            self.sequencia_historico_ativo = True
+
+        self.sprites_por_camada[self.camada_atual].append({
+            "id": self.sprite_selecionado,
+            "x": x_sprite,
+            "y": y_sprite
+        })
+
+        self.marcar_alteracao()
+        self.salvar_mensagem = "Sprite posicionado!"
+
+        return True
+
+    def processar_posicionamento_continuo(self):
+        if not self.arrastando_sprites:
+            return
+
+        if self.modo != "sprites" or self.sprite_selecionado is None:
+            return
+
+        agora = pygame.time.get_ticks()
+
+        if agora - self.tempo_ultimo_sprite < self.intervalo_sprites:
+            return
+
+        posicao = pygame.mouse.get_pos()
+
+        if posicao[0] >= self.painel_x:
+            return
+
+        posicao_mundo = self.obter_posicao_mundo(posicao)
+
+        if posicao_mundo is None:
+            return
+
+        self.tempo_ultimo_sprite = agora
+        self.posicionar_sprite(posicao_mundo)
 
 
     def alternar_tela_cheia(self):
@@ -893,6 +1275,52 @@ class EditorMapa:
             texto.get_rect(center=rect.center)
         )
 
+    def ajustar_zoom(self, novo_zoom, referencia):
+        novo_zoom = max(
+            self.zoom_minimo,
+            min(self.zoom_maximo, novo_zoom)
+        )
+
+        if novo_zoom == self.escala:
+            return
+
+        fator = novo_zoom / self.escala
+        mouse_x, mouse_y = referencia
+
+        self.posicao_mapa_x = round(
+            mouse_x - (mouse_x - self.posicao_mapa_x) * fator
+        )
+        self.posicao_mapa_y = round(
+            mouse_y - (mouse_y - self.posicao_mapa_y) * fator
+        )
+
+        self.escala = novo_zoom
+
+    def desenhar_indicador_zoom(self):
+        percentual = round(
+            (self.escala / self.escala_inicial) * 100
+        )
+
+        texto = self.fonte_pequena.render(
+            f"ZOOM: {percentual}%",
+            True,
+            (241, 241, 241)
+        )
+
+        rect = pygame.Rect(20, 16, 120, 32)
+
+        pygame.draw.rect(
+            self.tela, (32, 35, 43), rect, border_radius=5
+        )
+        pygame.draw.rect(
+            self.tela, (100, 130, 175), rect, 1, border_radius=5
+        )
+
+        self.tela.blit(
+            texto,
+            texto.get_rect(center=rect.center)
+        )
+
     def tratar_eventos(self):
         for evento in pygame.event.get():
 
@@ -901,7 +1329,53 @@ class EditorMapa:
 
             elif evento.type == pygame.KEYDOWN:
 
-                if evento.key == pygame.K_ESCAPE:
+                if (
+                    evento.key == pygame.K_z
+                    and pygame.key.get_mods() & pygame.KMOD_CTRL
+                ):
+                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                        self.refazer()
+                    else:
+                        self.desfazer()
+
+                elif evento.key in (
+                    pygame.K_PLUS,
+                    pygame.K_EQUALS,
+                    pygame.K_KP_PLUS
+                ):
+                    incremento = max(1, round(self.escala * 0.15))
+                    novo_zoom = self.escala + incremento
+
+                    self.ajustar_zoom(
+                        novo_zoom,
+                        (self.painel_x // 2, self.altura_janela // 2)
+                    )
+
+                elif evento.key in (
+                    pygame.K_MINUS,
+                    pygame.K_KP_MINUS
+                ):
+                    incremento = max(1, round(self.escala * 0.15))
+                    novo_zoom = self.escala - incremento
+
+                    self.ajustar_zoom(
+                        novo_zoom,
+                        (self.painel_x // 2, self.altura_janela // 2)
+                    )
+
+                elif evento.key in (
+                    pygame.K_0,
+                    pygame.K_KP0
+                ):
+                    self.ajustar_zoom(
+                        self.escala_inicial,
+                        (self.painel_x // 2, self.altura_janela // 2)
+                    )
+
+                elif evento.key == pygame.K_g:
+                    self.mostrar_grade = not self.mostrar_grade
+
+                elif evento.key == pygame.K_ESCAPE:
                     self.executando = False
 
                 elif evento.key == pygame.K_F11:
@@ -918,9 +1392,9 @@ class EditorMapa:
 
                 elif evento.key == pygame.K_p:
                     self.modo = (
-                        "sprites"
-                        if self.camada_atual == "superior"
-                        else "pintura"
+                        "pintura"
+                        if self.modo == "sprites"
+                        else "sprites"
                     )
 
                 elif evento.key == pygame.K_s:
@@ -946,11 +1420,18 @@ class EditorMapa:
                         )
                     )
 
-                    if self.camada_atual == "superior":
+                    if self.camada_atual in self.sprites_por_camada_imagens:
                         self.sprite_scroll = max(
                             0,
                             min(
-                                max(0, len(self.sprites) - 1),
+                                max(
+                                    0,
+                                    len(
+                                        self.sprites_por_camada_imagens[
+                                            self.camada_atual
+                                        ]
+                                    ) - 1
+                                ),
                                 self.sprite_scroll - evento.y
                             )
                         )
@@ -988,58 +1469,59 @@ class EditorMapa:
                     )
 
                     if botao_central.collidepoint(evento.pos):
+                        self.arrastando_sprites = False
                         self.voltar_central()
                     else:
+                        self.arrastando_sprites = (
+                            evento.pos[0] < self.painel_x
+                            and self.modo == "sprites"
+                            and self.sprite_selecionado is not None
+                            and self.obter_posicao_mundo(evento.pos) is not None
+                        )
+
+                        self.sequencia_historico_ativo = False
+                        self.tempo_ultimo_sprite = pygame.time.get_ticks()
+
                         self.tratar_clique(evento.pos)
 
                 elif evento.button == 3:
-                    if self.modo == "sprites":
-                        mouse_x, mouse_y = evento.pos
+                    if evento.pos[0] >= self.painel_x:
+                        continue
 
-                        fator = self.escala / self.tile_size
+                    elemento_removido = False
+                    camada = self.camada_atual
 
-                        mundo_x = (
-                            mouse_x - self.posicao_mapa_x
-                        ) / fator
+                    # Primeiro, verifica os sprites da camada atual.
+                    sprites = self.sprites_por_camada[camada]
 
-                        mundo_y = (
-                            mouse_y - self.posicao_mapa_y
-                        ) / fator
+                    for sprite in reversed(sprites):
+                        rect = self.obter_rect_sprite_tela(
+                            sprite, camada
+                        )
 
-                        for sprite in reversed(
-                            self.dados["sprites_superiores"]
-                        ):
-                            imagem = self.sprites.get(
-                                sprite["id"], {}
-                            ).get("imagem")
+                        if rect is not None and rect.collidepoint(evento.pos):
+                            self.registrar_estado_anterior()
+                            sprites.remove(sprite)
+                            self.marcar_alteracao()
+                            self.salvar_mensagem = "Sprite removido!"
+                            elemento_removido = True
+                            break
 
-                            if imagem is None:
-                                continue
-
-                            rect = pygame.Rect(
-                                sprite["x"],
-                                sprite["y"],
-                                imagem.get_width(),
-                                imagem.get_height()
-                            )
-
-                            if rect.collidepoint(mundo_x, mundo_y):
-                                self.dados[
-                                    "sprites_superiores"
-                                ].remove(sprite)
-
-                                self.salvar_mensagem = "Sprite removido!"
-                                break
-
-                    else:
+                    # Se não encontrou sprite, verifica o tile da camada atual.
+                    if not elemento_removido:
                         posicao = self.obter_posicao_tile(evento.pos)
 
                         if posicao is not None:
                             x, y = posicao
+                            matriz = self.dados["camadas"][camada]
 
-                            self.dados["camadas"][
-                                self.camada_atual
-                            ][y][x] = None
+                            if matriz[y][x] is not None:
+                                self.registrar_estado_anterior()
+                                matriz[y][x] = None
+                                self.marcar_alteracao()
+                                self.salvar_mensagem = (
+                                    f"Elemento removido: {camada}"
+                                )
 
             elif evento.type == pygame.VIDEORESIZE:
                 if not self.tela_cheia:
@@ -1059,7 +1541,12 @@ class EditorMapa:
                     )
 
             elif evento.type == pygame.MOUSEBUTTONUP:
-                if evento.button == 2:
+                if evento.button == 1:
+                    self.edicao_pintura_ativa = False
+                    self.arrastando_sprites = False
+                    self.sequencia_historico_ativo = False
+
+                elif evento.button == 2:
                     self.arrastando_camera = False
                     self.ultima_posicao_camera = None
 
@@ -1085,13 +1572,19 @@ class EditorMapa:
             self.relogio.tick(60)
 
             self.tratar_eventos()
+            self.processar_posicionamento_continuo()
+            self.processar_autosalvamento()
 
             self.tela.fill(COR_FUNDO)
 
             self.desenhar_mapa()
+            self.desenhar_indicador_zoom()
             self.desenhar_painel()
 
             pygame.display.flip()
+
+        if self.mapa_alterado:
+            self.salvar_mapa()
 
         pygame.quit()
 

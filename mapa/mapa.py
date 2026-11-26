@@ -4,6 +4,10 @@ from pathlib import Path
 
 import pygame
 
+from mapa.renderizador_mapa import RenderizadorMapa
+from objetos.objeto_mapa import ObjetoMapa
+from sistemas.catalogo_itens import CatalogoItens
+
 
 class Mapa:
     MOSTRAR_BORDAS = True
@@ -27,8 +31,13 @@ class Mapa:
             self.raiz / "mapa" / "colisoes.json"
         )
 
+        self.caminho_colisoes_sprites = (
+            self.raiz / "mapa" / "colisoes_sprites.json"
+        )
+
         self.carregar_mapa()
         self.carregar_sprites()
+        self.carregar_objetos()
         self.carregar_colisoes()
 
     def carregar_mapa(self):
@@ -57,184 +66,178 @@ class Mapa:
         )
 
     def carregar_sprites(self):
-        self.sprites = {}
+        self.renderizador = RenderizadorMapa(
+            self.raiz, self.dados
+        )
 
-        for caminho in self.caminho_sprites.rglob("*.png"):
-            identificador = (
-                caminho.relative_to(self.caminho_sprites)
-                .with_suffix("")
-                .as_posix()
+        self.sprites_por_camada = (
+            self.renderizador.sprites_por_camada
+        )
+
+        self.sprites = (
+            self.renderizador.imagens_por_camada.get(
+                "superior", {}
             )
+        )
 
-            imagem = pygame.image.load(
-                str(caminho)
-            ).convert_alpha()
+        self.sprites_superiores = (
+            self.sprites_por_camada.get("superior", [])
+        )
 
-            self.sprites[identificador] = imagem
+    def carregar_objetos(self):
+        caminho = self.raiz / "mapa" / "objetos_mapa.json"
+        self.objetos = []
+        self.areas_interacao_objetos = []
+
+        if not caminho.is_file():
+            return
+
+        with caminho.open("r", encoding="utf-8") as arquivo:
+            dados = json.load(arquivo)
+
+        catalogo = CatalogoItens()
+
+        for registro in dados.get("objetos", []):
+            objeto = ObjetoMapa(
+                registro["x"],
+                registro["y"],
+                registro["id"],
+                catalogo,
+            )
+            self.objetos.append(objeto)
+
+            for area in objeto.areas_interacao:
+                self.areas_interacao_objetos.append({
+                    "id": objeto.tipo,
+                    "tipo": "objeto",
+                    "rect": area.copy(),
+                })
+
+    def desenhar_objetos(self, tela, camera=None):
+        for objeto in self.objetos:
+            objeto.desenhar(tela, camera)
 
     def carregar_colisoes(self):
         self.obstaculos = []
         self.areas_interacao = []
+        self.obstaculos_sprites = []
 
-        if not self.caminho_colisoes.is_file():
-            return
+        # Colisoes convencionais do mapa.
+        if self.caminho_colisoes.is_file():
+            with self.caminho_colisoes.open(
+                "r", encoding="utf-8"
+            ) as arquivo:
+                dados = json.load(arquivo)
 
-        with self.caminho_colisoes.open(
-            "r", encoding="utf-8"
-        ) as arquivo:
-            dados = json.load(arquivo)
-
-        self.obstaculos = [
-            pygame.Rect(
-                item["x"],
-                item["y"],
-                item["largura"],
-                item["altura"]
-            )
-            for item in dados.get("obstaculos", [])
-        ]
-
-        self.areas_interacao = [
-            {
-                "id": item["id"],
-                "tipo": item["tipo"],
-                "rect": pygame.Rect(
+            self.obstaculos = [
+                pygame.Rect(
                     item["x"],
                     item["y"],
                     item["largura"],
                     item["altura"]
                 )
-            }
-            for item in dados.get("areas_interacao", [])
-        ]
+                for item in dados.get("obstaculos", [])
+            ]
 
-    def _escala(self, tela):
-        largura, altura = tela.get_size()
+            self.areas_interacao = [
+                {
+                    "id": item["id"],
+                    "tipo": item["tipo"],
+                    "rect": pygame.Rect(
+                        item["x"],
+                        item["y"],
+                        item["largura"],
+                        item["altura"]
+                    )
+                }
+                for item in dados.get("areas_interacao", [])
+            ]
 
-        return (
-            largura / self.largura_referencia,
-            altura / self.altura_referencia
-        )
+        # Colisoes definidas pelo editor de sprites.
+        if not self.caminho_colisoes_sprites.is_file():
+            return
 
-    def _escalar_rect(self, rect, sx, sy):
-        return pygame.Rect(
-            round(rect.x * sx),
-            round(rect.y * sy),
-            round(rect.width * sx),
-            round(rect.height * sy)
+        with self.caminho_colisoes_sprites.open(
+            "r", encoding="utf-8"
+        ) as arquivo:
+            dados_sprites = json.load(arquivo)
+
+        if dados_sprites.get("mapa") != self.caminho_mapa.stem:
+            print("Aviso: colisoes de sprites pertencem a outro mapa.")
+            return
+
+        colisoes_por_id = dados_sprites.get("sprites", {})
+        escala = 2.0
+
+        for camada, instancias in self.sprites_por_camada.items():
+            for instancia in instancias:
+                identificador = instancia.get("id")
+
+                if not identificador:
+                    continue
+
+                colisoes = colisoes_por_id.get(identificador, [])
+
+                for item in colisoes:
+                    self.obstaculos_sprites.append(
+                        pygame.Rect(
+                            instancia["x"] + item["x"] * escala,
+                            instancia["y"] + item["y"] * escala,
+                            item["largura"] * escala,
+                            item["altura"] * escala
+                        )
+                    )
+
+        print(
+            f"Colisoes de sprites carregadas: "
+            f"{len(self.obstaculos_sprites)}"
         )
 
     def obter_area_interacao(self, rect):
-        tela = pygame.display.get_surface()
-
-        if tela is None:
-            return None
-
-        sx, sy = self._escala(tela)
-
         for area in self.areas_interacao:
-            area_tela = self._escalar_rect(
-                area["rect"], sx, sy
-            )
-
-            if rect.colliderect(area_tela):
+            if rect.colliderect(area["rect"]):
                 return area
 
         return None
 
-    def desenhar_camadas(self, tela):
-        sx, sy = self._escala(tela)
+    def desenhar_camadas(self, tela, camera=None):
+        self.renderizador.desenhar_tiles(tela, camera)
 
-        tamanho_x = round(self.tile_size * sx)
-        tamanho_y = round(self.tile_size * sy)
+    def desenhar_sprites_superiores(self, tela, camera=None):
+        self.renderizador.desenhar_sprites_camada(
+            tela, "superior", camera
+        )
 
-        for nome_camada in self.camadas:
-            camada = self.dados["camadas"][nome_camada]
-
-            for y in range(self.altura):
-                for x in range(self.largura):
-                    identificador = camada[y][x]
-
-                    if identificador is None:
-                        continue
-
-                    informacoes = self.tiles.get(identificador)
-
-                    if informacoes is None:
-                        continue
-
-                    rect = pygame.Rect(
-                        round(x * self.tile_size * sx),
-                        round(y * self.tile_size * sy),
-                        tamanho_x,
-                        tamanho_y
-                    )
-
-                    pygame.draw.rect(
-                        tela,
-                        tuple(informacoes["cor"]),
-                        rect
-                    )
-
-    def desenhar_sprites_superiores(self, tela):
-        sx, sy = self._escala(tela)
-
-        for sprite in self.sprites_superiores:
-            identificador = sprite["id"]
-
-            imagem = self.sprites.get(identificador)
-
-            if imagem is None:
-                continue
-
-            largura = max(
-                1, round(imagem.get_width() * sx)
-            )
-
-            altura = max(
-                1, round(imagem.get_height() * sy)
-            )
-
-            imagem_redimensionada = pygame.transform.scale(
-                imagem,
-                (largura, altura)
-            )
-
-            x = round(sprite["x"] * sx)
-            y = round(sprite["y"] * sy)
-
-            tela.blit(imagem_redimensionada, (x, y))
-
-    def desenhar(self, tela):
+    def desenhar(self, tela, camera=None):
         tela.fill(self.COR_FUNDO)
-
-        self.desenhar_camadas(tela)
-        self.desenhar_sprites_superiores(tela)
+        self.renderizador.desenhar(tela, camera)
+        self.desenhar_objetos(tela, camera)
 
     def colide_com_obstaculo(self, rect):
-        tela = pygame.display.get_surface()
-
-        if tela is None:
-            return True
-
-        largura, altura = tela.get_size()
-
         if (
             rect.left < 0
             or rect.top < 0
-            or rect.right > largura
-            or rect.bottom > altura
+            or rect.right > self.largura_referencia
+            or rect.bottom > self.altura_referencia
         ):
             return True
 
-        sx, sy = self._escala(tela)
-
         for obstaculo in self.obstaculos:
-            obstaculo_tela = self._escalar_rect(
-                obstaculo, sx, sy
-            )
+            if rect.colliderect(obstaculo):
+                return True
 
-            if rect.colliderect(obstaculo_tela):
+        for obstaculo in self.obstaculos_sprites:
+            if rect.colliderect(obstaculo):
+                return True
+
+        for objeto in self.objetos:
+            if not objeto.solido:
+                continue
+
+            if any(
+                rect.colliderect(colisao)
+                for colisao in objeto.colisoes
+            ):
                 return True
 
         return False

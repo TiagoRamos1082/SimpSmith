@@ -3,24 +3,24 @@
     "altura_imagem": 960,
     "areas": [
         {
-            "x": 596,
-            "y": 502,
-            "largura": 34,
-            "altura": 4,
+            "x": 489,
+            "y": 371,
+            "largura": 76,
+            "altura": 90,
+            "tipo": "ferro",
+            "maximo": 5,
+            "inicial": 2,
+            "respawn": 12.0
+        },
+        {
+            "x": 31,
+            "y": 390,
+            "largura": 79,
+            "altura": 62,
             "tipo": "arbusto",
             "maximo": 3,
             "inicial": 3,
-            "respawn": 20.0
-        },
-        {
-            "x": 188,
-            "y": 254,
-            "largura": 97,
-            "altura": 74,
-            "tipo": "ferro",
-            "maximo": 6,
-            "inicial": 5,
-            "respawn": 8.0
+            "respawn": 5.0
         }
     ]
 }
