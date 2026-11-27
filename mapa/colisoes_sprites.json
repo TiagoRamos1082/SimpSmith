@@ -168,6 +168,22 @@
                 "altura": 18
             }
         ],
-        "gramas/Grama1": []
+        "gramas/Grama1": [],
+        "arvores/Pequena_Arvore": [
+            {
+                "x": 5,
+                "y": 8,
+                "largura": 16,
+                "altura": 15
+            }
+        ],
+        "vitoria_regia_media": [
+            {
+                "x": 7,
+                "y": 8,
+                "largura": 12,
+                "altura": 14
+            }
+        ]
     }
 }

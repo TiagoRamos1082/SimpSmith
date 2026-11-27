@@ -23,8 +23,6 @@ CAMINHO_OBJETOS = os.path.join(RAIZ, "mapa", "objetos_mapa.json")
 if not os.path.isfile(CAMINHO_MAPA):
     raise FileNotFoundError(f"Mapa nao encontrado: {CAMINHO_MAPA}")
 
-    raise FileNotFoundError(f"Imagem nÃ£o encontrada: {CAMINHO_IMAGEM}")
-
 catalogo = CatalogoItens()
 
 
@@ -78,10 +76,10 @@ def carregar_construcoes():
 
 CONSTRUCOES = carregar_construcoes()
 
-if not RECURSOS:
+if not RECURSOS and not CONSTRUCOES:
     raise ValueError(
-        "Nenhum item da categoria 'minerio' "
-        "foi encontrado em dados/itens.json."
+        "Nenhum item das categorias 'minerio', 'item' ou 'construcao' "
+        "com imagem foi encontrado em dados/itens/itens.json."
     )
 
 
@@ -152,8 +150,8 @@ ALTURA_RODAPE = 36
 LARGURA_PAINEL_ESQUERDO = 190
 LARGURA_PAINEL_DIREITO = 250
 
-modo_editor = "recursos"
-tipos_disponiveis = list(RECURSOS.keys())
+modo_editor = "recursos" if RECURSOS else "construcoes"
+tipos_disponiveis = list(RECURSOS.keys() if RECURSOS else CONSTRUCOES.keys())
 tipo_atual = tipos_disponiveis[0]
 deslocamento_lista_recursos = 0
 
@@ -980,7 +978,14 @@ while executando:
             )
 
             if imagem_objeto is not None:
-                tela.blit(imagem_objeto, visual_objeto)
+                imagem_renderizada = (
+                    imagem_objeto
+                    if imagem_objeto.get_size() == visual_objeto.size
+                    else pygame.transform.smoothscale(
+                        imagem_objeto, visual_objeto.size
+                    )
+                )
+                tela.blit(imagem_renderizada, visual_objeto.topleft)
             else:
                 pygame.draw.rect(tela, config_objeto["cor"], visual_objeto)
 
@@ -1009,8 +1014,12 @@ while executando:
 
             if imagem_previa_construcao is not None:
                 imagem_previa_construcao = imagem_previa_construcao.copy()
+                if imagem_previa_construcao.get_size() != visual_previa.size:
+                    imagem_previa_construcao = pygame.transform.smoothscale(
+                        imagem_previa_construcao, visual_previa.size
+                    )
                 imagem_previa_construcao.set_alpha(150)
-                tela.blit(imagem_previa_construcao, visual_previa)
+                tela.blit(imagem_previa_construcao, visual_previa.topleft)
 
             pygame.draw.rect(tela, COR_DESTAQUE, visual_previa, 2)
 

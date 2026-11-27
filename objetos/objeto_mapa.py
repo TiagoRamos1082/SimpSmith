@@ -27,7 +27,10 @@ class ObjetoMapa:
 
         self.largura_visual = item["largura_visual"]
         self.altura_visual = item["altura_visual"]
-        self.solido = bool(item.get("solido", True))
+        self.solido = bool(
+            item.get("colisao_ativa", item.get("solido", True))
+        )
+        self.interacao_ativa = bool(item.get("interacao_ativa", True))
 
         # x e y representam o canto superior esquerdo da imagem.
         self.area_visual = pygame.Rect(
@@ -36,29 +39,33 @@ class ObjetoMapa:
         )
         self.rect = self.area_visual.copy()
 
-        self.colisoes = []
-        self.areas_interacao = []
+        # Uma única geometria atende colisão física e interação.
+        # Se houver configuração antiga sem "colisao", usa "interacao"
+        # como compatibilidade para não perder áreas já cadastradas.
+        geometria = item.get("colisao") or item.get("interacao", [])
 
-        for dados in item.get("colisao", []):
+        # Cada retângulo pertence à mesma geometria lógica.
+        # Os estados são globais: não há ativação por retângulo.
+        self.geometria = []
+
+        for dados in geometria:
             area = pygame.Rect(
                 self.area_visual.x + dados["x"],
                 self.area_visual.y + dados["y"],
                 dados["largura"],
                 dados["altura"],
             )
+            self.geometria.append(area)
 
-            if self.solido and dados.get("ativa", True):
-                self.colisoes.append(area.copy())
+        self.colisoes = (
+            [area.copy() for area in self.geometria]
+            if self.solido else []
+        )
 
-        for dados in item.get("interacao", []):
-            self.areas_interacao.append(
-                pygame.Rect(
-                    self.area_visual.x + dados["x"],
-                    self.area_visual.y + dados["y"],
-                    dados["largura"],
-                    dados["altura"],
-                )
-            )
+        self.areas_interacao = (
+            [area.copy() for area in self.geometria]
+            if self.interacao_ativa else []
+        )
 
     def desenhar(self, tela, camera=None):
         area = self.area_visual

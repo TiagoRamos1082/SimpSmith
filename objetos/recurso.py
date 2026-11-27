@@ -29,33 +29,47 @@ class Recurso:
         self.largura_visual = item["largura_visual"]
         self.altura_visual = item["altura_visual"]
 
-        self.solido = bool(item.get("solido", True))
+        self.colisao_ativa = bool(
+            item.get("colisao_ativa", item.get("solido", True))
+        )
+        self.interacao_ativa = bool(
+            item.get("interacao_ativa", True)
+        )
+
+        # Compatibilidade com o sistema de colisão existente.
+        self.solido = self.colisao_ativa
+
         self.rect = pygame.Rect(x, y, tamanho, tamanho)
 
-        # Origem da imagem, centralizada no retângulo de posicionamento.
-        area_visual = pygame.Rect(
+        # A origem visual é centralizada no ponto de posicionamento.
+        self.area_visual = pygame.Rect(
             0, 0, self.largura_visual, self.altura_visual
         )
-        area_visual.center = self.rect.center
+        self.area_visual.center = self.rect.center
 
-        # A geometria de colisao tambem define a area de interacao.
-        # Retangulos inativos continuam interativos, mas nao bloqueiam
-        # fisicamente o jogador.
-        self.colisoes = []
-        self.areas_interacao = []
+        # Todos os retângulos pertencem à mesma geometria.
+        # O campo legado "ativa" não controla mais cada retângulo.
+        self.geometria = []
 
-        for dados_retangulo in item.get("colisao", []):
-            retangulo = pygame.Rect(
-                area_visual.left + dados_retangulo["x"],
-                area_visual.top + dados_retangulo["y"],
-                dados_retangulo["largura"],
-                dados_retangulo["altura"]
+        for dados in item.get("colisao", []):
+            self.geometria.append(
+                pygame.Rect(
+                    self.area_visual.left + dados["x"],
+                    self.area_visual.top + dados["y"],
+                    dados["largura"],
+                    dados["altura"],
+                )
             )
 
-            self.areas_interacao.append(retangulo)
+        self.colisoes = (
+            [area.copy() for area in self.geometria]
+            if self.colisao_ativa else []
+        )
 
-            if self.solido and dados_retangulo.get("ativa", True):
-                self.colisoes.append(retangulo.copy())
+        self.areas_interacao = (
+            [area.copy() for area in self.geometria]
+            if self.interacao_ativa else []
+        )
 
     def desenhar(self, tela, camera=None):
         if camera is None:

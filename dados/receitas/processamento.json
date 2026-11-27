@@ -1,10 +1,10 @@
-﻿{
+{
   "receitas": [
     {
       "id": "fundir_ferro",
       "nome": "Fundir Ferro",
       "tipo": "processamento",
-      "estacao": "fornalha",
+      "estacao": "bigorna",
       "ingredientes": {
         "ferro": 2
       },

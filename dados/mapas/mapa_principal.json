@@ -3872,11 +3872,6 @@
         },
         {
             "id": "vitoria_regia_media",
-            "x": 811,
-            "y": 312
-        },
-        {
-            "id": "vitoria_regia_media",
             "x": 790,
             "y": 135
         },
@@ -3884,46 +3879,6 @@
             "id": "vitoria_regia_media",
             "x": 704,
             "y": 114
-        },
-        {
-            "id": "gramas/Grama1",
-            "x": 817,
-            "y": 529
-        },
-        {
-            "id": "gramas/Grama1",
-            "x": 746,
-            "y": 528
-        },
-        {
-            "id": "gramas/Grama1",
-            "x": 684,
-            "y": 508
-        },
-        {
-            "id": "gramas/Grama3",
-            "x": 759,
-            "y": 532
-        },
-        {
-            "id": "gramas/Grama3",
-            "x": 862,
-            "y": 513
-        },
-        {
-            "id": "gramas/Grama3",
-            "x": 826,
-            "y": 515
-        },
-        {
-            "id": "gramas/Grama2",
-            "x": 713,
-            "y": 510
-        },
-        {
-            "id": "flores/Flor7",
-            "x": 798,
-            "y": 517
         },
         {
             "id": "gramas/Grama5",
@@ -4154,6 +4109,241 @@
             "id": "arvores/Arvore_Grande",
             "x": 496,
             "y": 530
+        },
+        {
+            "id": "flores/Flor6",
+            "x": 602,
+            "y": 572
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": -32,
+            "y": -13
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 32,
+            "y": -15
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": -14,
+            "y": 45
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 94,
+            "y": -21
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 160,
+            "y": -23
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 52,
+            "y": 47
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 201,
+            "y": 22
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 260,
+            "y": -32
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 271,
+            "y": -6
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 350,
+            "y": -44
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 426,
+            "y": -28
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 507,
+            "y": -44
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 375,
+            "y": 11
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 478,
+            "y": -13
+        },
+        {
+            "id": "cercas/Cerca_Pequena",
+            "x": 570,
+            "y": 130
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 658,
+            "y": -14
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 658,
+            "y": 6
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 657,
+            "y": 34
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 650,
+            "y": 57
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 654,
+            "y": 79
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 648,
+            "y": 104
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 582,
+            "y": -46
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 554,
+            "y": -9
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 570,
+            "y": 59
+        },
+        {
+            "id": "arvores/Arvore_Grande",
+            "x": 571,
+            "y": 532
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 598,
+            "y": 224
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 591,
+            "y": 251
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 602,
+            "y": 274
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 606,
+            "y": 301
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 606,
+            "y": 329
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 608,
+            "y": 357
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 603,
+            "y": 380
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 603,
+            "y": 380
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 594,
+            "y": 410
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 595,
+            "y": 432
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 606,
+            "y": 460
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 610,
+            "y": 481
+        },
+        {
+            "id": "arvores/Pequena_Arvore",
+            "x": 594,
+            "y": 493
+        },
+        {
+            "id": "vitoria_regia_media",
+            "x": 661,
+            "y": 383
+        },
+        {
+            "id": "vitoria_regia_media",
+            "x": 652,
+            "y": 540
+        },
+        {
+            "id": "vitoria_regia_media",
+            "x": 704,
+            "y": -10
+        },
+        {
+            "id": "flores/Flor7",
+            "x": 128,
+            "y": 349
+        },
+        {
+            "id": "flores/Flor7",
+            "x": 66,
+            "y": 322
+        },
+        {
+            "id": "flores/Flor7",
+            "x": 68,
+            "y": 262
+        },
+        {
+            "id": "flores/Flor7",
+            "x": 48,
+            "y": 201
+        },
+        {
+            "id": "flores/Flor7",
+            "x": 79,
+            "y": 161
         }
     ],
     "sprites_por_camada": {
@@ -4185,11 +4375,6 @@
             },
             {
                 "id": "vitoria_regia_media",
-                "x": 811,
-                "y": 312
-            },
-            {
-                "id": "vitoria_regia_media",
                 "x": 790,
                 "y": 135
             },
@@ -4197,46 +4382,6 @@
                 "id": "vitoria_regia_media",
                 "x": 704,
                 "y": 114
-            },
-            {
-                "id": "gramas/Grama1",
-                "x": 817,
-                "y": 529
-            },
-            {
-                "id": "gramas/Grama1",
-                "x": 746,
-                "y": 528
-            },
-            {
-                "id": "gramas/Grama1",
-                "x": 684,
-                "y": 508
-            },
-            {
-                "id": "gramas/Grama3",
-                "x": 759,
-                "y": 532
-            },
-            {
-                "id": "gramas/Grama3",
-                "x": 862,
-                "y": 513
-            },
-            {
-                "id": "gramas/Grama3",
-                "x": 826,
-                "y": 515
-            },
-            {
-                "id": "gramas/Grama2",
-                "x": 713,
-                "y": 510
-            },
-            {
-                "id": "flores/Flor7",
-                "x": 798,
-                "y": 517
             },
             {
                 "id": "gramas/Grama5",
@@ -4467,6 +4612,241 @@
                 "id": "arvores/Arvore_Grande",
                 "x": 496,
                 "y": 530
+            },
+            {
+                "id": "flores/Flor6",
+                "x": 602,
+                "y": 572
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": -32,
+                "y": -13
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 32,
+                "y": -15
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": -14,
+                "y": 45
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 94,
+                "y": -21
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 160,
+                "y": -23
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 52,
+                "y": 47
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 201,
+                "y": 22
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 260,
+                "y": -32
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 271,
+                "y": -6
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 350,
+                "y": -44
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 426,
+                "y": -28
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 507,
+                "y": -44
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 375,
+                "y": 11
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 478,
+                "y": -13
+            },
+            {
+                "id": "cercas/Cerca_Pequena",
+                "x": 570,
+                "y": 130
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 658,
+                "y": -14
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 658,
+                "y": 6
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 657,
+                "y": 34
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 650,
+                "y": 57
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 654,
+                "y": 79
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 648,
+                "y": 104
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 582,
+                "y": -46
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 554,
+                "y": -9
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 570,
+                "y": 59
+            },
+            {
+                "id": "arvores/Arvore_Grande",
+                "x": 571,
+                "y": 532
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 598,
+                "y": 224
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 591,
+                "y": 251
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 602,
+                "y": 274
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 606,
+                "y": 301
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 606,
+                "y": 329
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 608,
+                "y": 357
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 603,
+                "y": 380
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 603,
+                "y": 380
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 594,
+                "y": 410
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 595,
+                "y": 432
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 606,
+                "y": 460
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 610,
+                "y": 481
+            },
+            {
+                "id": "arvores/Pequena_Arvore",
+                "x": 594,
+                "y": 493
+            },
+            {
+                "id": "vitoria_regia_media",
+                "x": 661,
+                "y": 383
+            },
+            {
+                "id": "vitoria_regia_media",
+                "x": 652,
+                "y": 540
+            },
+            {
+                "id": "vitoria_regia_media",
+                "x": 704,
+                "y": -10
+            },
+            {
+                "id": "flores/Flor7",
+                "x": 128,
+                "y": 349
+            },
+            {
+                "id": "flores/Flor7",
+                "x": 66,
+                "y": 322
+            },
+            {
+                "id": "flores/Flor7",
+                "x": 68,
+                "y": 262
+            },
+            {
+                "id": "flores/Flor7",
+                "x": 48,
+                "y": 201
+            },
+            {
+                "id": "flores/Flor7",
+                "x": 79,
+                "y": 161
             }
         ],
         "terreno": [
@@ -4637,11 +5017,6 @@
             },
             {
                 "id": "Agua3x3",
-                "x": 625,
-                "y": 152
-            },
-            {
-                "id": "Agua3x3",
                 "x": 660,
                 "y": 134
             },
@@ -4649,11 +5024,6 @@
                 "id": "Agua3x3",
                 "x": 638,
                 "y": 76
-            },
-            {
-                "id": "Agua3x3",
-                "x": 634,
-                "y": 105
             },
             {
                 "id": "Agua3x3",
@@ -4674,16 +5044,6 @@
                 "id": "Agua3x3",
                 "x": 626,
                 "y": 66
-            },
-            {
-                "id": "Agua3x3",
-                "x": 633,
-                "y": 142
-            },
-            {
-                "id": "Agua3x3",
-                "x": 632,
-                "y": 120
             },
             {
                 "id": "Agua3x3",
@@ -5072,11 +5432,6 @@
             },
             {
                 "id": "Agua3x3",
-                "x": 616,
-                "y": -11
-            },
-            {
-                "id": "Agua3x3",
                 "x": 686,
                 "y": -18
             },
@@ -5084,6 +5439,226 @@
                 "id": "Agua3x3",
                 "x": 749,
                 "y": -19
+            },
+            {
+                "id": "Terra2x1",
+                "x": 635,
+                "y": 39
+            },
+            {
+                "id": "Terra2x1",
+                "x": 642,
+                "y": 36
+            },
+            {
+                "id": "Terra2x1",
+                "x": 642,
+                "y": 42
+            },
+            {
+                "id": "Terra2x1",
+                "x": 641,
+                "y": 61
+            },
+            {
+                "id": "Terra2x1",
+                "x": 639,
+                "y": 77
+            },
+            {
+                "id": "Terra2x1",
+                "x": 637,
+                "y": 92
+            },
+            {
+                "id": "Terra2x1",
+                "x": 637,
+                "y": 97
+            },
+            {
+                "id": "Terra2x1",
+                "x": 637,
+                "y": 109
+            },
+            {
+                "id": "Terra2x1",
+                "x": 622,
+                "y": 36
+            },
+            {
+                "id": "Terra2x1",
+                "x": 620,
+                "y": 65
+            },
+            {
+                "id": "Terra2x1",
+                "x": 620,
+                "y": 105
+            },
+            {
+                "id": "Terra2x1",
+                "x": 616,
+                "y": 84
+            },
+            {
+                "id": "Terra2x1",
+                "x": 617,
+                "y": 70
+            },
+            {
+                "id": "Terra2x1",
+                "x": 614,
+                "y": 82
+            },
+            {
+                "id": "Terra2x1",
+                "x": 613,
+                "y": 44
+            },
+            {
+                "id": "Terra2x1",
+                "x": 613,
+                "y": 41
+            },
+            {
+                "id": "Terra2x1",
+                "x": 605,
+                "y": 117
+            },
+            {
+                "id": "Terra2x1",
+                "x": 605,
+                "y": 117
+            },
+            {
+                "id": "Terra2x1",
+                "x": 609,
+                "y": 128
+            },
+            {
+                "id": "Terra2x1",
+                "x": 630,
+                "y": 118
+            },
+            {
+                "id": "Terra2x1",
+                "x": 627,
+                "y": 123
+            },
+            {
+                "id": "Agua3x3",
+                "x": 666,
+                "y": 463
+            },
+            {
+                "id": "Agua3x3",
+                "x": 730,
+                "y": 477
+            },
+            {
+                "id": "Agua3x3",
+                "x": 730,
+                "y": 478
+            },
+            {
+                "id": "Agua3x3",
+                "x": 797,
+                "y": 488
+            },
+            {
+                "id": "Agua3x3",
+                "x": 850,
+                "y": 493
+            },
+            {
+                "id": "Agua3x3",
+                "x": 907,
+                "y": 495
+            },
+            {
+                "id": "Agua3x3",
+                "x": 960,
+                "y": 489
+            },
+            {
+                "id": "Agua3x3",
+                "x": 979,
+                "y": 518
+            },
+            {
+                "id": "Agua3x3",
+                "x": 921,
+                "y": 539
+            },
+            {
+                "id": "Agua3x3",
+                "x": 854,
+                "y": 545
+            },
+            {
+                "id": "Agua3x3",
+                "x": 795,
+                "y": 540
+            },
+            {
+                "id": "Agua3x3",
+                "x": 734,
+                "y": 538
+            },
+            {
+                "id": "Agua3x3",
+                "x": 675,
+                "y": 517
+            },
+            {
+                "id": "Agua3x3",
+                "x": 646,
+                "y": 493
+            },
+            {
+                "id": "Agua3x3",
+                "x": 646,
+                "y": 514
+            },
+            {
+                "id": "Agua3x3",
+                "x": 675,
+                "y": 554
+            },
+            {
+                "id": "Agua3x3",
+                "x": 706,
+                "y": 567
+            },
+            {
+                "id": "Agua3x3",
+                "x": 775,
+                "y": 576
+            },
+            {
+                "id": "Agua3x3",
+                "x": 869,
+                "y": 578
+            },
+            {
+                "id": "Agua3x3",
+                "x": 937,
+                "y": 578
+            },
+            {
+                "id": "Agua3x3",
+                "x": 967,
+                "y": 578
+            },
+            {
+                "id": "Agua3x3",
+                "x": 816,
+                "y": 582
+            },
+            {
+                "id": "Agua3x3",
+                "x": 642,
+                "y": 449
             }
         ],
         "objetos": []

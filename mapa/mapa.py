@@ -109,7 +109,7 @@ class Mapa:
             for area in objeto.areas_interacao:
                 self.areas_interacao_objetos.append({
                     "id": objeto.tipo,
-                    "tipo": "objeto",
+                    "tipo": objeto.tipo,
                     "rect": area.copy(),
                 })
 
@@ -194,7 +194,13 @@ class Mapa:
         )
 
     def obter_area_interacao(self, rect):
+        # Áreas tradicionais configuradas no mapa.
         for area in self.areas_interacao:
+            if rect.colliderect(area["rect"]):
+                return area
+
+        # Áreas das construções cadastradas no NGC.
+        for area in self.areas_interacao_objetos:
             if rect.colliderect(area["rect"]):
                 return area
 

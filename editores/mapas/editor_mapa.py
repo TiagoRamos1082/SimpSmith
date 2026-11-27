@@ -3,11 +3,21 @@ import json
 import copy
 import pygame
 import ctypes
+import sys
 from pathlib import Path
 
 
 RAIZ = Path(__file__).resolve().parents[2]
+
+if str(RAIZ) not in sys.path:
+    sys.path.insert(0, str(RAIZ))
+
+from sistemas.catalogo_itens import CatalogoItens
+from sistemas.carregador_imagens import obter_imagem
+
 CAMINHO_MAPA = RAIZ / "dados" / "mapas" / "mapa_principal.json"
+CAMINHO_OBJETOS = RAIZ / "mapa" / "objetos_mapa.json"
+CATEGORIAS_CONSTRUCAO = {"item", "construcao"}
 
 TAMANHO_TILE = 32
 
@@ -128,6 +138,189 @@ class EditorMapa:
         self.sequencia_historico_ativo = False
         self.tempo_ultimo_sprite = 0
         self.intervalo_sprites = 150
+
+        # Construções (bigorna etc.) salvas em mapa/objetos_mapa.json.
+        self.paleta_aberta = False
+        self.construcao_selecionada = None
+        self.paleta_scroll = 0
+        self.catalogo = CatalogoItens()
+        self.construcoes = []
+        self.objetos_mapa = []
+        self.carregar_construcoes_mapa()
+
+    # ------------------------------------------------------------------
+    # CONSTRUCOES
+    # ------------------------------------------------------------------
+
+    def carregar_construcoes_mapa(self):
+        self.construcoes = [
+            item for item in self.catalogo.listar()
+            if item["categoria"] in CATEGORIAS_CONSTRUCAO
+            and item.get("imagem")
+        ]
+
+        if self.construcoes and self.construcao_selecionada is None:
+            self.construcao_selecionada = self.construcoes[0]["id"]
+
+        self.objetos_mapa = []
+
+        if not CAMINHO_OBJETOS.is_file():
+            return
+
+        try:
+            with CAMINHO_OBJETOS.open("r", encoding="utf-8-sig") as arquivo:
+                registros = json.load(arquivo).get("objetos", [])
+        except (OSError, ValueError) as erro:
+            self.salvar_mensagem = f"Erro ao ler construcoes: {erro}"
+            return
+
+        for registro in registros:
+            if self.catalogo.obter(registro.get("id")) is None:
+                continue
+
+            self.objetos_mapa.append({
+                "id": registro["id"],
+                "x": int(registro["x"]),
+                "y": int(registro["y"]),
+            })
+
+    def salvar_objetos_mapa(self):
+        temporario = CAMINHO_OBJETOS.with_suffix(".tmp")
+
+        try:
+            CAMINHO_OBJETOS.parent.mkdir(parents=True, exist_ok=True)
+
+            with temporario.open("w", encoding="utf-8") as arquivo:
+                json.dump(
+                    {"objetos": self.objetos_mapa},
+                    arquivo, indent=4, ensure_ascii=False
+                )
+
+            temporario.replace(CAMINHO_OBJETOS)
+            self.salvar_mensagem = (
+                f"{len(self.objetos_mapa)} construcoes salvas!"
+            )
+        except OSError as erro:
+            self.salvar_mensagem = f"Erro ao salvar construcoes: {erro}"
+
+    def obter_rect_objeto_tela(self, registro):
+        item = self.catalogo.obter(registro["id"])
+        fator = self.escala / self.tile_size
+
+        return pygame.Rect(
+            self.posicao_mapa_x + round(registro["x"] * fator),
+            self.posicao_mapa_y + round(registro["y"] * fator),
+            max(1, round(item["largura_visual"] * fator)),
+            max(1, round(item["altura_visual"] * fator)),
+        )
+
+    def desenhar_objetos_mapa(self):
+        for registro in self.objetos_mapa:
+            item = self.catalogo.obter(registro["id"])
+            rect = self.obter_rect_objeto_tela(registro)
+            imagem = obter_imagem(
+                item.get("imagem"),
+                (item["largura_visual"], item["altura_visual"])
+            )
+
+            if imagem is not None:
+                self.tela.blit(
+                    pygame.transform.scale(imagem, rect.size), rect.topleft
+                )
+            else:
+                pygame.draw.rect(self.tela, tuple(item["cor"]), rect)
+
+            if self.paleta_aberta:
+                pygame.draw.rect(self.tela, COR_SELECAO, rect, 1)
+
+    def obter_rect_paleta(self):
+        altura = min(
+            self.altura_janela - self.posicao_mapa_y - 30,
+            44 + max(1, len(self.construcoes)) * 30
+        )
+        return pygame.Rect(
+            self.posicao_mapa_x + 8, self.posicao_mapa_y + 8, 230, altura
+        )
+
+    def obter_linhas_paleta(self):
+        paleta = self.obter_rect_paleta()
+        return [
+            (item, pygame.Rect(paleta.x + 6, paleta.y + 38 + i * 30
+                               - self.paleta_scroll, paleta.width - 12, 26))
+            for i, item in enumerate(self.construcoes)
+        ]
+
+    def desenhar_paleta_construcoes(self):
+        if not self.paleta_aberta:
+            return
+
+        paleta = self.obter_rect_paleta()
+        pygame.draw.rect(self.tela, (32, 35, 43), paleta, border_radius=6)
+        pygame.draw.rect(self.tela, COR_SELECAO, paleta, 1, border_radius=6)
+        self.desenhar_texto(
+            "CONSTRUCOES (C: fechar)", paleta.x + 8, paleta.y + 8,
+            self.fonte_pequena
+        )
+
+        if not self.construcoes:
+            self.desenhar_texto(
+                "Nenhuma construcao cadastrada.", paleta.x + 8,
+                paleta.y + 40, self.fonte_pequena
+            )
+            return
+
+        self.tela.set_clip(paleta.inflate(-4, -4))
+        for item, linha in self.obter_linhas_paleta():
+            ativo = item["id"] == self.construcao_selecionada
+            pygame.draw.rect(
+                self.tela, (60, 66, 80) if ativo else (43, 47, 57),
+                linha, border_radius=4
+            )
+            if ativo:
+                pygame.draw.rect(self.tela, COR_SELECAO, linha, 1, border_radius=4)
+            self.desenhar_texto(
+                f"{item['nome']} ({item['categoria']})",
+                linha.x + 6, linha.y + 6, self.fonte_pequena
+            )
+        self.tela.set_clip(None)
+
+    def tratar_clique_construcoes(self, posicao):
+        """Retorna True quando o clique foi consumido pela paleta/colocação."""
+
+        if not self.paleta_aberta or posicao[0] >= self.painel_x:
+            return False
+
+        if self.obter_rect_paleta().collidepoint(posicao):
+            for item, linha in self.obter_linhas_paleta():
+                if linha.collidepoint(posicao):
+                    self.construcao_selecionada = item["id"]
+            return True
+
+        item = self.catalogo.obter(self.construcao_selecionada)
+        mundo = self.obter_posicao_mundo(posicao)
+
+        if item is None or mundo is None:
+            return True
+
+        # x e y são o canto superior esquerdo; o clique fica no centro.
+        x = max(0, mundo[0] - item["largura_visual"] // 2)
+        y = max(0, mundo[1] - item["altura_visual"] // 2)
+
+        self.objetos_mapa.append({"id": item["id"], "x": x, "y": y})
+        self.salvar_objetos_mapa()
+        return True
+
+    def remover_construcao_em(self, posicao):
+        if not self.paleta_aberta:
+            return False
+
+        for registro in reversed(self.objetos_mapa):
+            if self.obter_rect_objeto_tela(registro).collidepoint(posicao):
+                self.objetos_mapa.remove(registro)
+                self.salvar_objetos_mapa()
+                return True
+
+        return False
 
     @property
     def camada_atual(self):
@@ -477,6 +670,7 @@ class EditorMapa:
 
             self.desenhar_sprites_camada(nome_camada)
 
+        self.desenhar_objetos_mapa()
         self.desenhar_grade_auxiliar()
         self.desenhar_spawn()
         self.desenhar_preview_spawn()
@@ -1390,6 +1584,15 @@ class EditorMapa:
                 elif evento.key == pygame.K_d:
                     self.atualizar_camada(1)
 
+                elif evento.key == pygame.K_c:
+                    self.paleta_aberta = not self.paleta_aberta
+                    self.salvar_mensagem = (
+                        "Paleta de construcoes aberta: clique no mapa para "
+                        "colocar, botao direito remove."
+                        if self.paleta_aberta
+                        else "Paleta de construcoes fechada."
+                    )
+
                 elif evento.key == pygame.K_p:
                     self.modo = (
                         "pintura"
@@ -1471,6 +1674,8 @@ class EditorMapa:
                     if botao_central.collidepoint(evento.pos):
                         self.arrastando_sprites = False
                         self.voltar_central()
+                    elif self.tratar_clique_construcoes(evento.pos):
+                        self.arrastando_sprites = False
                     else:
                         self.arrastando_sprites = (
                             evento.pos[0] < self.painel_x
@@ -1486,6 +1691,9 @@ class EditorMapa:
 
                 elif evento.button == 3:
                     if evento.pos[0] >= self.painel_x:
+                        continue
+
+                    if self.remover_construcao_em(evento.pos):
                         continue
 
                     elemento_removido = False
@@ -1579,6 +1787,7 @@ class EditorMapa:
 
             self.desenhar_mapa()
             self.desenhar_indicador_zoom()
+            self.desenhar_paleta_construcoes()
             self.desenhar_painel()
 
             pygame.display.flip()

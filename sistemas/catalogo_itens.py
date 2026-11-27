@@ -207,10 +207,23 @@ class CatalogoItens:
             raise ValueError("Peso, preço, tempo e cor precisam ser números.") from erro
 
         item["solido"] = bool(item.get("solido", True))
+        item["colisao_ativa"] = bool(
+            item.get("colisao_ativa", item["solido"])
+        )
+        item["interacao_ativa"] = bool(
+            item.get("interacao_ativa", True)
+        )
+        item["solido"] = item["colisao_ativa"]
         item["respawn"] = bool(item.get("respawn", True))
 
-        # Interação é representada pelas áreas geométricas.
-        # A ação será responsabilidade do sistema específico do objeto.
+        # Interação e colisão compartilham a mesma geometria.
+        # Migra dados antigos de interação quando não há colisões.
+        geometria_antiga = (
+            item["colisao"]
+            if "colisao" in item
+            else item.get("interacao")
+        )
+
         item.pop("interagivel", None)
         item.pop("tipo_interacao", None)
 
@@ -218,26 +231,23 @@ class CatalogoItens:
         item["imagem"] = str(imagem).strip() if imagem else None
 
         item["colisao"] = CatalogoItens._normalizar_lista_retangulos(
-            item.get("colisao"),
+            geometria_antiga,
             {
                 "x": 0,
                 "y": 0,
                 "largura": 32,
                 "altura": 32,
-                "ativa": item["solido"],
+                "ativa": item["colisao_ativa"],
             },
             permitir_ativa=True,
         )
 
-        item["interacao"] = CatalogoItens._normalizar_lista_retangulos(
-            item.get("interacao"),
-            {
-                "x": 0,
-                "y": 0,
-                "largura": 32,
-                "altura": 32,
-            },
-        )
+        # Mantém compatibilidade com código/editor legado,
+        # mas sem permitir uma segunda geometria independente.
+        item["interacao"] = [
+            dict(retangulo)
+            for retangulo in item["colisao"]
+        ]
 
         return item
 

@@ -13,14 +13,44 @@
             "respawn": 12.0
         },
         {
-            "x": 31,
-            "y": 390,
-            "largura": 79,
-            "altura": 62,
+            "x": 21,
+            "y": 162,
+            "largura": 104,
+            "altura": 58,
+            "tipo": "carvao",
+            "maximo": 3,
+            "inicial": 3,
+            "respawn": 15.0
+        },
+        {
+            "x": 417,
+            "y": 117,
+            "largura": 27,
+            "altura": 30,
+            "tipo": "ouro",
+            "maximo": 1,
+            "inicial": 0,
+            "respawn": 50.0
+        },
+        {
+            "x": 7,
+            "y": 398,
+            "largura": 46,
+            "altura": 50,
+            "tipo": "pedra",
+            "maximo": 2,
+            "inicial": 0,
+            "respawn": 15.0
+        },
+        {
+            "x": 64,
+            "y": 397,
+            "largura": 69,
+            "altura": 56,
             "tipo": "arbusto",
             "maximo": 3,
             "inicial": 3,
-            "respawn": 5.0
+            "respawn": 20.0
         }
     ]
 }

@@ -79,7 +79,11 @@ class Mineracao:
                 self._cancelar()
 
     def _encontrar_alvo(self, jogador, spawn):
-        jogador_rect = jogador.rect
+        jogador_rect = (
+            jogador.rect_colisao
+            if hasattr(jogador, "rect_colisao")
+            else jogador.rect
+        )
         alvos_validos = []
 
         tamanho_sensor = self.TAMANHO_SENSOR

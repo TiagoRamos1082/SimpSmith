@@ -98,6 +98,15 @@ item_selecionado_id = (
 )
 rolagem_itens = 0
 
+CATEGORIAS_FILTRO = [
+    ("todos", "Todos"),
+    ("minerio", "Minérios"),
+    ("construcao", "Construções"),
+    ("item", "Itens"),
+    ("material", "Materiais"),
+]
+filtro_categoria = "todos"
+
 # Ferramentas de desenho na previa dos recursos.
 ferramenta_recurso = "colisao"
 colisao_recurso_selecionada = None
@@ -888,6 +897,74 @@ def desenhar_sprites_superiores(area, escala):
     desenhar_sprites_camada("superior", area, escala)
 
 
+CAMINHO_OBJETOS = RAIZ / "mapa" / "objetos_mapa.json"
+_cache_objetos = {"mtime": None, "dados": []}
+
+
+def carregar_objetos_mapa():
+    """Lê mapa/objetos_mapa.json (com cache por data de modificação)."""
+
+    try:
+        mtime = CAMINHO_OBJETOS.stat().st_mtime
+    except OSError:
+        return []
+
+    if _cache_objetos["mtime"] != mtime:
+        try:
+            with open(CAMINHO_OBJETOS, "r", encoding="utf-8-sig") as arquivo:
+                _cache_objetos["dados"] = list(
+                    json.load(arquivo).get("objetos", [])
+                )
+        except (OSError, ValueError):
+            _cache_objetos["dados"] = []
+
+        _cache_objetos["mtime"] = mtime
+
+    return _cache_objetos["dados"]
+
+
+def desenhar_objetos_mapa(area, escala, bordas=False):
+    """Mostra as construções posicionadas (bigorna etc.) no mapa."""
+
+    for registro in carregar_objetos_mapa():
+        item = catalogo_editor.obter(registro.get("id"))
+
+        if item is None:
+            continue
+
+        largura = int(item["largura_visual"])
+        altura = int(item["altura_visual"])
+        x = area.x + round(registro["x"] * escala)
+        y = area.y + round(registro["y"] * escala)
+
+        if not bordas:
+            imagem = obter_imagem(item.get("imagem"), (largura, altura))
+            tamanho = (
+                max(1, round(largura * escala)),
+                max(1, round(altura * escala)),
+            )
+
+            if imagem is not None:
+                tela.blit(pygame.transform.scale(imagem, tamanho), (x, y))
+            else:
+                pygame.draw.rect(tela, tuple(item["cor"]), (x, y, *tamanho))
+            continue
+
+        for secao, cor in (("colisao", COR_OBSTACULO), ("interacao", COR_INTERACAO)):
+            for retangulo in item.get(secao, []):
+                pygame.draw.rect(
+                    tela,
+                    cor,
+                    (
+                        x + round(retangulo["x"] * escala),
+                        y + round(retangulo["y"] * escala),
+                        max(1, round(retangulo["largura"] * escala)),
+                        max(1, round(retangulo["altura"] * escala)),
+                    ),
+                    2,
+                )
+
+
 
 def apagar_proximo(posicao):
     if modo == "recursos":
@@ -1047,6 +1124,10 @@ def salvar_desenho_previa_recurso():
     x1, y1 = inicio_previa_recurso
     x2, y2 = fim_previa_recurso
 
+    # Um clique ou arrasto sem dimensão não cria geometria.
+    if x1 == x2 or y1 == y2:
+        return
+
     retangulo = {
         "x": min(x1, x2),
         "y": min(y1, y2),
@@ -1054,16 +1135,14 @@ def salvar_desenho_previa_recurso():
         "altura": max(1, abs(y2 - y1)),
     }
 
-    secao = ferramenta_recurso
-    if secao not in ("colisao", "interacao"):
-        secao = "colisao"
+    # Colisão e interação usam a mesma área.
+    secao = "colisao"
 
     dados = dict(item)
     dados["colisao"] = [dict(r) for r in item.get("colisao", [])]
     dados["interacao"] = [dict(r) for r in item.get("interacao", [])]
 
     if secao == "colisao":
-        retangulo["ativa"] = bool(item.get("solido", True))
         dados["colisao"].append(retangulo)
         colisao_recurso_selecionada = len(dados["colisao"]) - 1
     else:
@@ -1084,9 +1163,8 @@ def apagar_retangulo_recurso(posicao):
     if item is None:
         return
 
-    secao = ferramenta_recurso
-    if secao not in ("colisao", "interacao"):
-        secao = "colisao"
+    # Colisão e interação usam a mesma área.
+    secao = "colisao"
 
     layout = obter_layout_previa_recurso(item, posicao)
     sprite = layout["sprite"]
@@ -1129,10 +1207,88 @@ def obter_lista_recursos():
 
     return pygame.Rect(
         10,
+        ALTURA_CABECALHO + 80,
+        LARGURA_PAINEL_ESQUERDO - 20,
+        max(70, altura - ALTURA_CABECALHO - ALTURA_RODAPE - 90)
+    )
+
+
+def obter_botao_filtro():
+    return pygame.Rect(
+        10,
         ALTURA_CABECALHO + 42,
         LARGURA_PAINEL_ESQUERDO - 20,
-        max(70, altura - ALTURA_CABECALHO - ALTURA_RODAPE - 52)
+        30
     )
+
+
+def obter_itens_visiveis():
+    """Itens da lista lateral, respeitando o filtro de categoria."""
+
+    if filtro_categoria == "todos":
+        return itens_editor
+
+    return [
+        item for item in itens_editor
+        if item["categoria"] == filtro_categoria
+    ]
+
+
+def alternar_filtro_categoria(sentido=1):
+    """Troca a categoria exibida e seleciona o primeiro item dela."""
+
+    global filtro_categoria, rolagem_itens
+
+    chaves = [chave for chave, _ in CATEGORIAS_FILTRO]
+    indice = (chaves.index(filtro_categoria) + sentido) % len(chaves)
+    filtro_categoria = chaves[indice]
+    rolagem_itens = 0
+
+    visiveis = obter_itens_visiveis()
+    if visiveis and item_selecionado_id not in {i["id"] for i in visiveis}:
+        selecionar_item_por_id(visiveis[0]["id"])
+
+
+def ajustar_zoom_para_item(item):
+    """Enquadra a prévia isolada do item na área central."""
+
+    global zoom_recurso
+
+    if item is None:
+        return
+
+    largura_tela = max(
+        100, tela.get_width() - LARGURA_PAINEL_ESQUERDO - LARGURA_PAINEL_DIREITO
+    )
+    altura_tela = max(
+        100, tela.get_height() - ALTURA_CABECALHO - ALTURA_RODAPE
+    )
+    escala_base = min(largura_tela / IMG_LARGURA, altura_tela / IMG_ALTURA)
+    escala_ajustada = min(
+        largura_tela / max(1, int(item["largura_visual"])),
+        altura_tela / max(1, int(item["altura_visual"]))
+    ) * 0.90
+
+    zoom_recurso = max(0.05, min(zoom_maximo, escala_ajustada / escala_base))
+
+
+def selecionar_item_por_id(novo_id):
+    """Seleciona um item e limpa os estados da previa."""
+
+    global item_selecionado_id
+    global colisao_recurso_selecionada, interacao_recurso_selecionada
+    global visualizacao_recurso_ativa, centro_previa_recurso
+    global arrastando_previa_recurso, inicio_previa_recurso, fim_previa_recurso
+
+    item_selecionado_id = novo_id
+    ajustar_zoom_para_item(catalogo_editor.obter(novo_id))
+    colisao_recurso_selecionada = None
+    interacao_recurso_selecionada = None
+    visualizacao_recurso_ativa = False
+    centro_previa_recurso = None
+    arrastando_previa_recurso = False
+    inicio_previa_recurso = None
+    fim_previa_recurso = None
 
 
 def selecionar_recurso_pelo_mouse(posicao):
@@ -1152,8 +1308,10 @@ def selecionar_recurso_pelo_mouse(posicao):
         // ALTURA_LINHA_RECURSO
     )
 
-    if 0 <= indice < len(itens_editor):
-        novo_id = itens_editor[indice]["id"]
+    visiveis = obter_itens_visiveis()
+
+    if 0 <= indice < len(visiveis):
+        novo_id = visiveis[indice]["id"]
 
         if novo_id != item_selecionado_id:
             item_selecionado_id = novo_id
@@ -1221,6 +1379,14 @@ def ajustar_propriedade_recurso(secao, propriedade, variacao):
             min(512, dados[propriedade] + variacao)
         )
 
+    elif secao == "config":
+        if propriedade not in ("colisao_ativa", "interacao_ativa"):
+            return
+
+        dados[propriedade] = not bool(item.get(propriedade, True))
+        if propriedade == "colisao_ativa":
+            dados["solido"] = dados[propriedade]
+
     elif secao in ("colisao", "interacao"):
         if propriedade not in ("x", "y", "largura", "altura"):
             return
@@ -1266,8 +1432,19 @@ def obter_botoes_recursos():
     adicionar_dimensao("largura_visual", ALTURA_CABECALHO + 184)
     adicionar_dimensao("altura_visual", ALTURA_CABECALHO + 213)
 
+    largura_metade = (largura - 8) // 2
+    botoes[("config", "colisao_ativa")] = pygame.Rect(
+        x, ALTURA_CABECALHO + 385, largura_metade, 25
+    )
+    botoes[("config", "interacao_ativa")] = pygame.Rect(
+        x + largura_metade + 8,
+        ALTURA_CABECALHO + 385,
+        largura_metade,
+        25
+    )
+
     botoes[("ferramenta", "colisao")] = pygame.Rect(
-        x, ALTURA_CABECALHO + 385, largura, 30
+        x, ALTURA_CABECALHO + 415, largura, 30
     )
 
     return botoes
@@ -1293,6 +1470,10 @@ def desenhar_previa_recurso_central():
     sprite = layout["sprite"]
     if sprite is None:
         return
+
+    area_visualizacao = layout.get("area")
+    if area_visualizacao is not None:
+        pygame.draw.rect(tela, PAINEL_CLARO, area_visualizacao, 1)
 
     if item.get("imagem"):
         imagem = obter_imagem(
@@ -1333,7 +1514,7 @@ def desenhar_previa_recurso_central():
                  "altura": max(1, abs(y2 - y1))},
                 item, sprite
             )
-            cor = COR_OBSTACULO if ferramenta_recurso == "colisao" else COR_INTERACAO
+            cor = COR_OBSTACULO
             pygame.draw.rect(tela, cor, visual, 2)
 
 
@@ -1352,9 +1533,17 @@ def desenhar_painel_recursos():
     pygame.draw.line(tela, PAINEL_CLARO, painel_esquerdo.topright, painel_esquerdo.bottomright, 1)
     tela.blit(fonte.render("RECURSOS E ITENS", True, COR_DESTAQUE), (12, ALTURA_CABECALHO + 12))
 
+    botao_filtro = obter_botao_filtro()
+    rotulo_filtro = dict(CATEGORIAS_FILTRO)[filtro_categoria]
+    pygame.draw.rect(tela, PAINEL_CLARO, botao_filtro, border_radius=5)
+    pygame.draw.rect(tela, COR_DESTAQUE, botao_filtro, 1, border_radius=5)
+    texto_filtro = fonte_pequena.render(f"Categoria: {rotulo_filtro}  >", True, COR_TEXTO)
+    tela.blit(texto_filtro, texto_filtro.get_rect(center=botao_filtro.center))
+
     pygame.draw.rect(tela, FUNDO, lista, border_radius=5)
+    pygame.draw.rect(tela, PAINEL_CLARO, lista, 1, border_radius=5)
     tela.set_clip(lista)
-    for indice, recurso in enumerate(itens_editor):
+    for indice, recurso in enumerate(obter_itens_visiveis()):
         y_linha = lista.y + indice * ALTURA_LINHA_RECURSO - rolagem_itens
         linha = pygame.Rect(lista.x + 2, y_linha, lista.width - 4, ALTURA_LINHA_RECURSO - 2)
         selecionado = recurso["id"] == item_selecionado_id
@@ -1368,9 +1557,32 @@ def desenhar_painel_recursos():
     pygame.draw.rect(tela, PAINEL, painel)
     pygame.draw.line(tela, PAINEL_CLARO, painel.topleft, painel.bottomleft, 1)
     x = painel.x + 14
+
+    # Seções independentes do painel.
+    def desenhar_secao(rect):
+        pygame.draw.rect(tela, FUNDO, rect, border_radius=7)
+        pygame.draw.rect(tela, PAINEL_CLARO, rect, 1, border_radius=7)
+
+    largura_secao = painel.width - 28
+
+    # Identificação e visualização.
+    desenhar_secao(pygame.Rect(
+        x, ALTURA_CABECALHO + 40, largura_secao, 116
+    ))
+
+    # Dimensões visuais.
+    desenhar_secao(pygame.Rect(
+        x, ALTURA_CABECALHO + 160, largura_secao, 94
+    ))
+
+    # Ferramentas e geometria.
+    desenhar_secao(pygame.Rect(
+        x, ALTURA_CABECALHO + 325, largura_secao, 145
+    ))
+
     tela.blit(fonte.render("PROPRIEDADES", True, COR_DESTAQUE), (x, ALTURA_CABECALHO + 14))
     if item is None:
-        tela.blit(fonte_pequena.render("Selecione um recurso.", True, COR_SECUNDARIA), (x, ALTURA_CABECALHO + 52))
+        tela.blit(fonte_pequena.render("Selecione um item.", True, COR_SECUNDARIA), (x, ALTURA_CABECALHO + 52))
         return
 
     tela.blit(fonte.render(item["nome"], True, COR_TEXTO), (x, ALTURA_CABECALHO + 48))
@@ -1379,7 +1591,7 @@ def desenhar_painel_recursos():
     botao_visualizar = obter_botao_visualizar_recurso()
     pygame.draw.rect(tela, COR_DESTAQUE if visualizacao_recurso_ativa else PAINEL_CLARO, botao_visualizar, border_radius=5)
     pygame.draw.rect(tela, COR_DESTAQUE, botao_visualizar, 1, border_radius=5)
-    texto = fonte.render("VOLTAR AO MINERIO" if visualizacao_recurso_ativa else "VISUALIZAR NO MAPA", True, COR_TEXTO)
+    texto = fonte.render("VOLTAR AO ITEM" if visualizacao_recurso_ativa else "VISUALIZAR NO MAPA", True, COR_TEXTO)
     tela.blit(texto, texto.get_rect(center=botao_visualizar.center))
 
     y = ALTURA_CABECALHO + 166
@@ -1412,29 +1624,55 @@ def desenhar_painel_recursos():
     )
 
     tela.blit(
-        fonte_pequena.render("AREA DE COLISAO", True, COR_DESTAQUE),
+        fonte_pequena.render("AREAS DE COLISAO E INTERACAO", True, COR_DESTAQUE),
         (x, ALTURA_CABECALHO + 339)
     )
 
     lista_areas = item.get("colisao", [])
-    indice = indice_retangulo_recurso("colisao", item)
     tela.blit(
-        fonte_pequena.render(f"{len(lista_areas)} colisao(oes)", True, COR_TEXTO),
+        fonte_pequena.render(
+            f"{len(lista_areas)} partes da mesma geometria",
+            True, COR_TEXTO
+        ),
         (x + 3, ALTURA_CABECALHO + 362)
     )
 
-    rect_ferramenta = botoes[("ferramenta", "colisao")]
-    pygame.draw.rect(tela, COR_DESTAQUE, rect_ferramenta, border_radius=4)
-    texto_botao = fonte_pequena.render("EDITAR COLISOES", True, COR_TEXTO)
-    tela.blit(texto_botao, texto_botao.get_rect(center=rect_ferramenta.center))
+    for propriedade, rotulo in (
+        ("colisao_ativa", "COLISAO"),
+        ("interacao_ativa", "INTERACAO"),
+    ):
+        ativo = bool(item.get(propriedade, propriedade == "interacao_ativa"))
+        botao = botoes[("config", propriedade)]
+        cor = COR_DESTAQUE if ativo else PAINEL_CLARO
+        pygame.draw.rect(tela, cor, botao, border_radius=4)
+        pygame.draw.rect(tela, cor, botao, 1, border_radius=4)
+        texto = fonte_pequena.render(
+            f"{rotulo}: {'SIM' if ativo else 'NAO'}",
+            True, COR_TEXTO
+        )
+        tela.blit(texto, texto.get_rect(center=botao.center))
 
-    tela.blit(
-        fonte_pequena.render("Arraste sobre o recurso para adicionar.", True, COR_SECUNDARIA),
-        (x + 3, ALTURA_CABECALHO + 425)
+    rect_ferramenta = botoes[("ferramenta", "colisao")]
+    pygame.draw.rect(
+        tela, COR_OBSTACULO, rect_ferramenta, border_radius=4
+    )
+    pygame.draw.rect(
+        tela, COR_OBSTACULO, rect_ferramenta, 1, border_radius=4
+    )
+    texto_botao = fonte_pequena.render(
+        "EDITAR AREA DE COLISAO + INTERACAO", True, COR_TEXTO
     )
     tela.blit(
-        fonte_pequena.render("Botao direito: excluir area.", True, COR_SECUNDARIA),
-        (x + 3, ALTURA_CABECALHO + 445)
+        texto_botao,
+        texto_botao.get_rect(center=rect_ferramenta.center)
+    )
+
+    tela.blit(
+        fonte_pequena.render(
+            "Arraste para adicionar | Botao direito: excluir",
+            True, COR_SECUNDARIA
+        ),
+        (x + 3, ALTURA_CABECALHO + 449)
     )
 
 
@@ -2484,7 +2722,7 @@ while executando:
 
                 if lista.collidepoint(mouse):
                     altura_conteudo = (
-                        len(itens_editor) * ALTURA_LINHA_RECURSO
+                        len(obter_itens_visiveis()) * ALTURA_LINHA_RECURSO
                     )
                     limite = max(0, altura_conteudo - lista.height)
 
@@ -2618,6 +2856,10 @@ while executando:
                     continue
 
                 if modo == "recursos":
+                    if obter_botao_filtro().collidepoint(evento.pos):
+                        alternar_filtro_categoria(1)
+                        continue
+
                     if obter_lista_recursos().collidepoint(evento.pos):
                         selecionar_recurso_pelo_mouse(evento.pos)
                         continue
@@ -2637,13 +2879,15 @@ while executando:
                         item = catalogo_editor.obter(item_selecionado_id)
                         if item is not None:
                             botoes = obter_botoes_recursos()
-                            ferramenta_clicada = (
-                                "colisao"
-                                if botoes[("ferramenta", "colisao")].collidepoint(evento.pos)
-                                else None
+                            ferramenta_clicada = next(
+                                (
+                                    nome for nome in ("colisao",)
+                                    if botoes[("ferramenta", nome)].collidepoint(evento.pos)
+                                ),
+                                None
                             )
                             if ferramenta_clicada is not None:
-                                ferramenta_recurso = ferramenta_clicada
+                                ferramenta_recurso = "colisao"
                                 centro_previa_recurso = None
                                 arrastando_previa_recurso = False
                                 inicio_previa_recurso = None
@@ -2651,6 +2895,22 @@ while executando:
                                 continue
 
                             acao_realizada = False
+
+                            for propriedade in (
+                                "colisao_ativa",
+                                "interacao_ativa",
+                            ):
+                                botao = botoes[("config", propriedade)]
+                                if botao.collidepoint(evento.pos):
+                                    ajustar_propriedade_recurso(
+                                        "config", propriedade, 0
+                                    )
+                                    acao_realizada = True
+                                    break
+
+                            if acao_realizada:
+                                continue
+
                             for (secao, propriedade), controles in botoes.items():
                                 if secao in ("ferramenta", "config"):
                                     continue
@@ -2685,13 +2945,14 @@ while executando:
                         )
                     ):
                         indice = encontrar_retangulo_recurso(
-                            item, "colisao", evento.pos, sprite_previa
+                            item, ferramenta_recurso, evento.pos, sprite_previa
                         )
 
                         if indice is not None:
                             colisao_recurso_selecionada = indice
                         else:
                             colisao_recurso_selecionada = None
+                            interacao_recurso_selecionada = None
                             centro_previa_recurso = (
                                 evento.pos if visualizacao_recurso_ativa else None
                             )
@@ -2953,6 +3214,7 @@ while executando:
         # Sprites do mapa
         desenhar_sprites_terreno(area, escala)
         desenhar_sprites_superiores(area, escala)
+        desenhar_objetos_mapa(area, escala)
 
         # Grade
         if mostrar_grade:
@@ -3006,6 +3268,7 @@ while executando:
 
             # Colisoes reutilizaveis dos sprites
             desenhar_colisoes_sprites(area, escala)
+            desenhar_objetos_mapa(area, escala, bordas=True)
 
         # Retangulo em criacao
         if arrastando and inicio is not None and fim is not None:
