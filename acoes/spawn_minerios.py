@@ -1,3 +1,4 @@
+
 import json
 import os
 import random
@@ -13,7 +14,9 @@ class SpawnMinerios:
 
     def __init__(self, mapa):
         raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.caminho_areas = os.path.join(raiz, "mapa", "areas_minerios.json")
+        self.caminho_areas = os.path.join(
+            raiz, "mapa", "areas_minerios.json"
+        )
         self.catalogo = CatalogoItens()
         self.mapa = mapa
         self.areas = []
@@ -24,25 +27,39 @@ class SpawnMinerios:
 
     def _carregar_areas(self):
         if not os.path.isfile(self.caminho_areas):
-            raise FileNotFoundError(f"Arquivo de áreas não encontrado: {self.caminho_areas}")
+            raise FileNotFoundError(
+                f"Arquivo de áreas não encontrado: {self.caminho_areas}"
+            )
 
         with open(self.caminho_areas, "r", encoding="utf-8") as arquivo:
             dados = json.load(arquivo)
 
-        self.areas = dados.get("areas", [])
+        areas_carregadas = dados.get("areas", [])
+        self.areas = []
 
-        for area in self.areas:
+        for area in areas_carregadas:
             item = self.catalogo.obter(area["tipo"])
-            if item is None or item["categoria"] not in {"minerio", "planta"}:
+
+            if item is None or item["categoria"] != "minerio":
                 raise ValueError(
-                    f"'{area['tipo']}' não existe no catálogo como recurso (minerio ou planta). "
-                    "Confira dados/itens.json e mapa/areas_minerios.json."
+                    f"'{area['tipo']}' não existe no catálogo como recurso "
+                    "(minerio). Confira o catálogo e o arquivo "
+                    "mapa/areas_minerios.json."
                 )
 
-            if area["largura"] < self.TAMANHO_MINERIO:
-                raise ValueError("Área muito estreita para um minério.")
-            if area["altura"] < self.TAMANHO_MINERIO:
-                raise ValueError("Área muito baixa para um minério.")
+            largura = int(area["largura"])
+            altura = int(area["altura"])
+
+            if (
+                largura < self.TAMANHO_MINERIO
+                or altura < self.TAMANHO_MINERIO
+            ):
+                print(
+                    f"[AVISO] Área ignorada: {area['tipo']} "
+                    f"({largura}x{altura}). "
+                    f"Mínimo: {self.TAMANHO_MINERIO}x{self.TAMANHO_MINERIO}."
+                )
+                continue
 
             maximo = int(area.get("maximo", 3))
             inicial = int(area.get("inicial", min(3, maximo)))
@@ -50,13 +67,18 @@ class SpawnMinerios:
 
             if maximo < 1 or not 0 <= inicial <= maximo:
                 raise ValueError("Configuração de quantidade inválida.")
+
             if respawn <= 0:
-                raise ValueError("O tempo de respawn deve ser maior que zero.")
+                raise ValueError(
+                    "O tempo de respawn deve ser maior que zero."
+                )
 
             area["_maximo"] = maximo
             area["_inicial"] = inicial
             area["_respawn"] = respawn
             area["_pode_respawn"] = bool(item.get("respawn", True))
+
+            self.areas.append(area)
 
         self.tempos_respawn = [0.0] * len(self.areas)
 
@@ -65,9 +87,12 @@ class SpawnMinerios:
             for indice, area in enumerate(self.areas):
                 for _ in range(area["_inicial"]):
                     minerio = self._criar_minerio(indice, jogador)
+
                     if minerio is None:
                         break
+
                     self.minerios.append(minerio)
+
             self.inicializado = True
             return
 
@@ -76,37 +101,42 @@ class SpawnMinerios:
                 continue
 
             existentes = self._minerios_da_area(indice)
+
             if len(existentes) < area["_maximo"]:
                 self.tempos_respawn[indice] += dt
+
                 if self.tempos_respawn[indice] >= area["_respawn"]:
                     minerio = self._criar_minerio(indice, jogador)
+
                     if minerio is not None:
                         self.minerios.append(minerio)
                         self.tempos_respawn[indice] = 0.0
             else:
                 self.tempos_respawn[indice] = 0.0
 
-    def _area_na_tela(self, area):
-        tela = pygame.display.get_surface()
-        sx = tela.get_width() / self.mapa.largura_referencia
-        sy = tela.get_height() / self.mapa.altura_referencia
+    def _area_no_mundo(self, area):
         return pygame.Rect(
-            round(area["x"] * sx),
-            round(area["y"] * sy),
-            round(area["largura"] * sx),
-            round(area["altura"] * sy),
+            area["x"],
+            area["y"],
+            area["largura"],
+            area["altura"]
         )
 
+
     def _minerios_da_area(self, indice):
-        area = self._area_na_tela(self.areas[indice])
+        area = self._area_no_mundo(self.areas[indice])
+
         return [
-            minerio for minerio in self.minerios
-            if minerio.area_indice == indice and area.contains(minerio.rect)
+            minerio
+            for minerio in self.minerios
+            if minerio.area_indice == indice
+            and area.contains(minerio.rect)
         ]
 
     def _criar_minerio(self, indice, jogador):
-        area = self._area_na_tela(self.areas[indice])
+        area = self._area_no_mundo(self.areas[indice])
         tamanho = self.TAMANHO_MINERIO
+
         if area.width < tamanho or area.height < tamanho:
             return None
 
@@ -116,16 +146,29 @@ class SpawnMinerios:
         for _ in range(self.TENTATIVAS_SPAWN):
             x = random.randint(area.left, max_x)
             y = random.randint(area.top, max_y)
+
             candidato = pygame.Rect(x, y, tamanho, tamanho)
 
             if candidato.colliderect(jogador.rect):
                 continue
-            if any(candidato.colliderect(m.rect) for m in self.minerios):
+
+            if any(
+                candidato.colliderect(m.rect)
+                for m in self.minerios
+            ):
                 continue
+
             if self.mapa.colide_com_obstaculo(candidato):
                 continue
 
-            minerio = Recurso(x, y, self.areas[indice]["tipo"], tamanho, self.catalogo)
+            minerio = Recurso(
+                x,
+                y,
+                self.areas[indice]["tipo"],
+                tamanho,
+                self.catalogo,
+            )
+
             minerio.area_indice = indice
             return minerio
 
@@ -137,6 +180,6 @@ class SpawnMinerios:
             self.minerios.remove(minerio)
             self.tempos_respawn[indice] = 0.0
 
-    def desenhar(self, tela):
+    def desenhar(self, tela, camera=None):
         for minerio in self.minerios:
-            minerio.desenhar(tela)
+            minerio.desenhar(tela, camera)

@@ -1,0 +1,12 @@
+{
+    "visual": {
+        "largura": 41,
+        "altura": 45
+    },
+    "colisao": {
+        "x": 3,
+        "y": 6,
+        "largura": 25,
+        "altura": 33
+    }
+}

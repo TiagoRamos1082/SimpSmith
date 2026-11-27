@@ -1,0 +1,189 @@
+{
+    "mapa": "mapa_principal",
+    "sprites": {
+        "arvores/Arvore_Grande": [
+            {
+                "x": 20,
+                "y": 0,
+                "largura": 6,
+                "altura": 11
+            },
+            {
+                "x": 17,
+                "y": 3,
+                "largura": 15,
+                "altura": 11
+            },
+            {
+                "x": 10,
+                "y": 9,
+                "largura": 28,
+                "altura": 12
+            },
+            {
+                "x": 6,
+                "y": 17,
+                "largura": 37,
+                "altura": 13
+            },
+            {
+                "x": 7,
+                "y": 30,
+                "largura": 35,
+                "altura": 5
+            },
+            {
+                "x": 10,
+                "y": 35,
+                "largura": 28,
+                "altura": 12
+            }
+        ],
+        "casas/Casa_Media": [
+            {
+                "x": 3,
+                "y": 26,
+                "largura": 6,
+                "altura": 3
+            },
+            {
+                "x": 20,
+                "y": 8,
+                "largura": 7,
+                "altura": 3
+            },
+            {
+                "x": 18,
+                "y": 11,
+                "largura": 12,
+                "altura": 3
+            },
+            {
+                "x": 15,
+                "y": 15,
+                "largura": 19,
+                "altura": 4
+            },
+            {
+                "x": 10,
+                "y": 19,
+                "largura": 28,
+                "altura": 4
+            },
+            {
+                "x": 7,
+                "y": 23,
+                "largura": 34,
+                "altura": 5
+            },
+            {
+                "x": 4,
+                "y": 25,
+                "largura": 40,
+                "altura": 3
+            },
+            {
+                "x": 1,
+                "y": 28,
+                "largura": 47,
+                "altura": 48
+            }
+        ],
+        "gramas/Grama3": [],
+        "cercas/Cerca_Pequena": [
+            {
+                "x": 8,
+                "y": 10,
+                "largura": 8,
+                "altura": 13
+            },
+            {
+                "x": 5,
+                "y": 14,
+                "largura": 39,
+                "altura": 6
+            },
+            {
+                "x": 21,
+                "y": 8,
+                "largura": 7,
+                "altura": 6
+            },
+            {
+                "x": 33,
+                "y": 8,
+                "largura": 7,
+                "altura": 7
+            }
+        ],
+        "casas/Casa_Grande": [
+            {
+                "x": 0,
+                "y": 30,
+                "largura": 48,
+                "altura": 44
+            },
+            {
+                "x": 47,
+                "y": 32,
+                "largura": 25,
+                "altura": 32
+            },
+            {
+                "x": 8,
+                "y": 23,
+                "largura": 35,
+                "altura": 8
+            },
+            {
+                "x": 15,
+                "y": 15,
+                "largura": 21,
+                "altura": 8
+            },
+            {
+                "x": 20,
+                "y": 10,
+                "largura": 9,
+                "altura": 5
+            }
+        ],
+        "outras_estruturas/Ponte_E_Barco": [
+            {
+                "x": 1,
+                "y": 27,
+                "largura": 56,
+                "altura": 7
+            },
+            {
+                "x": 0,
+                "y": 0,
+                "largura": 56,
+                "altura": 3
+            },
+            {
+                "x": 54,
+                "y": 9,
+                "largura": 3,
+                "altura": 18
+            }
+        ],
+        "gramas/Grama1": [],
+        "arvores/Pequena_Arvore": [
+            {
+                "x": 5,
+                "y": 8,
+                "largura": 16,
+                "altura": 15
+            }
+        ],
+        "vitoria_regia_media": [
+            {
+                "x": 7,
+                "y": 8,
+                "largura": 12,
+                "altura": 14
+            }
+        ]
+    }
+}

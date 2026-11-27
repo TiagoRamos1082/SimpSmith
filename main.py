@@ -2,6 +2,7 @@
 import sys
 
 from mapa.mapa import Mapa
+from mapa.camera import Camera
 from personagens.jogador import Jogador
 from acoes.movimentacao import Movimentacao
 from acoes.mineracao import Mineracao
@@ -20,10 +21,17 @@ from interface.interface_menu import InterfaceMenu
 
 def criar_partida():
     mapa = Mapa()
-    jogador = Jogador(550, 500)
+    spawn = mapa.spawn_jogador
+
+    jogador = Jogador(
+        spawn["x"],
+        spawn["y"]
+    )
 
     tutorial = Tutorial()
     spawn = SpawnMinerios(mapa)
+    superficie = pygame.display.get_surface()
+    camera = Camera(*superficie.get_size())
 
     interface_inventario = InterfaceInventario()
     interface_crafting = InterfaceCrafting()
@@ -34,10 +42,11 @@ def criar_partida():
     )
 
     mineracao = Mineracao(inventario)
-    crafting = Crafting(mapa)
+    crafting = Crafting(mapa, inventario)
 
     return {
         "mapa": mapa,
+        "camera": camera,
         "jogador": jogador,
         "tutorial": tutorial,
         "spawn": spawn,
@@ -52,11 +61,14 @@ def criar_partida():
 def main():
     pygame.init()
 
-    LARGURA = 1920
-    ALTURA = 1080
+    informacoes_tela = pygame.display.Info()
+    LARGURA = min(1280, informacoes_tela.current_w)
+    ALTURA = min(720, informacoes_tela.current_h)
     FPS = 60
 
-    tela = pygame.display.set_mode((LARGURA, ALTURA))
+    tela = pygame.display.set_mode(
+        (LARGURA, ALTURA), pygame.RESIZABLE
+    )
     pygame.display.set_caption("SimpSmith")
 
     relogio = pygame.time.Clock()
@@ -81,6 +93,16 @@ def main():
         dt = min(relogio.tick(FPS) / 1000, 0.05)
 
         for evento in pygame.event.get():
+
+            if evento.type == pygame.VIDEORESIZE:
+                tela = pygame.display.set_mode(
+                    (evento.w, evento.h), pygame.RESIZABLE
+                )
+                if gerenciador.estado == "jogo":
+                    gerenciador.partida["camera"].redimensionar(
+                        *tela.get_size()
+                    )
+                continue
 
             if evento.type == pygame.QUIT:
                 gerenciador.executando = False
@@ -174,6 +196,7 @@ def main():
 
             mapa = partida["mapa"]
             jogador = partida["jogador"]
+            camera = partida["camera"]
             spawn = partida["spawn"]
             inventario = partida["inventario"]
             mineracao = partida["mineracao"]
@@ -189,9 +212,9 @@ def main():
                 or interface_crafting.aberto
             )
 
-            if not interface_aberta:
+            spawn.atualizar(dt, jogador)
 
-                spawn.atualizar(dt, jogador)
+            if not interface_aberta:
 
                 mineracao.atualizar(
                     dt, jogador, spawn
@@ -203,7 +226,8 @@ def main():
                         mapa,
                         dt,
                         spawn.minerios,
-                        inventario
+                        inventario,
+                        objetos=mapa.objetos
                     )
 
             else:
@@ -214,9 +238,15 @@ def main():
                 mineracao, interface_inventario
             )
 
-            mapa.desenhar(tela)
-            spawn.desenhar(tela)
-            jogador.desenhar(tela)
+            camera.atualizar(
+                jogador.rect,
+                mapa.largura_referencia,
+                mapa.altura_referencia
+            )
+
+            mapa.desenhar(tela, camera)
+            spawn.desenhar(tela, camera)
+            jogador.desenhar(tela, camera)
             mineracao.desenhar(tela)
 
             interface_inventario.desenhar(

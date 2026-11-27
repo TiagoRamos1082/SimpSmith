@@ -1,34 +1,86 @@
-
+﻿
 import pygame
+import json
 from pathlib import Path
 
 
 class Personagem:
+    ESCALA_VISUAL = 0.85
     def __init__(self, x, y, velocidade=150):
         self.x = float(x)
         self.y = float(y)
         self.velocidade = velocidade
 
-        # Dimensões do personagem
-        self.largura = 32
-        self.altura = 40
+        # DimensÃµes do personagem
+        self.configuracao = self._carregar_configuracao()
+
+        visual = self.configuracao["visual"]
+        colisao = self.configuracao["colisao"]
+
+        self.largura = visual["largura"]
+        self.altura = visual["altura"]
+
+        self.colisao_x = colisao["x"]
+        self.colisao_y = colisao["y"]
+        self.colisao_largura = colisao["largura"]
+        self.colisao_altura = colisao["altura"]
 
         # Estado
         self.direcao = "down"
         self.andando = False
 
-        # Animação
+        # AnimaÃ§Ã£o
         self.tempo_animacao = 0
         self.velocidade_animacao = 8
 
         # Carrega os sprites
         self.sprites = self._carregar_sprites()
 
+    def _carregar_configuracao(self):
+        caminho = (
+            Path(__file__).resolve().parent.parent
+            / "dados" / "personagens" / "jogador.json"
+        )
+
+        padrao = {
+            "visual": {"largura": 32, "altura": 40},
+            "colisao": {"x": 7, "y": 5, "largura": 18, "altura": 33}
+        }
+
+        try:
+            with caminho.open("r", encoding="utf-8") as arquivo:
+                dados = json.load(arquivo)
+
+            visual = dados["visual"]
+            colisao = dados["colisao"]
+
+            largura = max(1, min(256, int(visual["largura"])))
+            altura = max(1, min(256, int(visual["altura"])))
+
+            hitbox_largura = max(1, min(largura, int(colisao["largura"])))
+            hitbox_altura = max(1, min(altura, int(colisao["altura"])))
+
+            hitbox_x = max(0, min(largura - hitbox_largura, int(colisao["x"])))
+            hitbox_y = max(0, min(altura - hitbox_altura, int(colisao["y"])))
+
+            return {
+                "visual": {"largura": largura, "altura": altura},
+                "colisao": {
+                    "x": hitbox_x,
+                    "y": hitbox_y,
+                    "largura": hitbox_largura,
+                    "altura": hitbox_altura
+                }
+            }
+
+        except (OSError, ValueError, TypeError, KeyError):
+            return padrao
+
     def _carregar_sprites(self):
         pasta = (
             Path(__file__).resolve().parent.parent
             / "assets"
-            / "player"
+            / "personagens" / "player"
         )
 
         arquivos = {
@@ -45,7 +97,7 @@ class Personagem:
 
             if not caminho.exists():
                 raise FileNotFoundError(
-                    f"Sprite não encontrado: {caminho}"
+                    f"Sprite nÃ£o encontrado: {caminho}"
                 )
 
             sheet = pygame.image.load(
@@ -76,7 +128,7 @@ class Personagem:
                     )
                 ).copy()
 
-                # Encontra os pixels visíveis.
+                # Encontra os pixels visÃ­veis.
                 limites = frame.get_bounding_rect()
 
                 canvas = pygame.Surface(
@@ -93,7 +145,7 @@ class Personagem:
                     escala = min(
                         self.largura / sprite.get_width(),
                         self.altura / sprite.get_height()
-                    )
+                    ) * self.ESCALA_VISUAL
 
                     nova_largura = max(
                         1,
@@ -115,7 +167,7 @@ class Personagem:
                         self.largura - nova_largura
                     ) // 2
 
-                    # Alinha pela base dos pés.
+                    # Alinha pela base dos pÃ©s.
                     pos_y = (
                         self.altura - nova_altura
                     )
@@ -130,6 +182,23 @@ class Personagem:
             sprites[direcao] = frames
 
         return sprites
+
+    def obter_rect_colisao(self, x=None, y=None):
+        if x is None:
+            x = self.x
+        if y is None:
+            y = self.y
+
+        return pygame.Rect(
+            round(x) + self.colisao_x,
+            round(y) + self.colisao_y,
+            self.colisao_largura,
+            self.colisao_altura
+        )
+
+    @property
+    def rect_colisao(self):
+        return self.obter_rect_colisao()
 
     @property
     def rect(self):
@@ -146,7 +215,7 @@ class Personagem:
         else:
             self.tempo_animacao = 0
 
-    def desenhar(self, tela):
+    def desenhar(self, tela, camera=None):
         frames = self.sprites[self.direcao]
 
         if self.andando:
@@ -159,40 +228,9 @@ class Personagem:
 
         sprite = frames[indice]
 
-        x = round(self.x)
-        y = round(self.y)
+        posicao = (round(self.x), round(self.y))
 
-        # Desenha o sprite.
-        tela.blit(sprite, (x, y))
+        if camera is not None:
+            posicao = camera.aplicar(posicao)
 
-        # # BORDA DE TESTE: área total do personagem.
-        # pygame.draw.rect(
-        #     tela,
-        #     (255, 0, 255),
-        #     (x, y, self.largura, self.altura),
-        #     1
-        # )
-
-        # # LINHA AMARELA: centro horizontal.
-        # pygame.draw.line(
-        #     tela,
-        #     (255, 255, 0),
-        #     (x + self.largura // 2, y),
-        #     (
-        #         x + self.largura // 2,
-        #         y + self.altura - 1
-        #     ),
-        #     1
-        # )
-
-        # # LINHA CIANO: base dos pés.
-        # pygame.draw.line(
-        #     tela,
-        #     (0, 255, 255),
-        #     (x, y + self.altura - 1),
-        #     (
-        #         x + self.largura - 1,
-        #         y + self.altura - 1
-        #     ),
-        #     1
-        # )
+        tela.blit(sprite, posicao)

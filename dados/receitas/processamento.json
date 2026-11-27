@@ -1,0 +1,16 @@
+{
+  "receitas": [
+    {
+      "id": "fundir_ferro",
+      "nome": "Fundir Ferro",
+      "tipo": "processamento",
+      "estacao": "bigorna",
+      "ingredientes": {
+        "ferro": 2
+      },
+      "resultado": {
+        "barra_ferro": 1
+      }
+    }
+  ]
+}

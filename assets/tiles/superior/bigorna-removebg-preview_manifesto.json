@@ -1,0 +1,22 @@
+{
+    "origem": "/home/tiago-ramos/Downloads/bigorna-removebg-preview.png",
+    "modo": "manual",
+    "camada": "superior",
+    "dimensoes_imagem": {
+        "largura": 500,
+        "altura": 500
+    },
+    "sprites": [
+        {
+            "id": "bigorna-removebg-preview_001",
+            "arquivo": "bigorna-removebg-preview_001.png",
+            "camada": "superior",
+            "coluna": null,
+            "linha": null,
+            "x_original": 67,
+            "y_original": 140,
+            "largura": 385,
+            "altura": 215
+        }
+    ]
+}
